@@ -1,34 +1,112 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, Share2, Gift, Trophy, Copy, Check } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const ReferralScreen = () => {
+  const { user } = useAuth();
   const [copied, setCopied] = useState(false);
-  const referralCode = 'GOODDEEDS2024';
-  const referralLink = `https://gooddeeds.app/ref/${referralCode}`;
+  const [referralCode, setReferralCode] = useState('');
+  const [referralStats, setReferralStats] = useState({
+    totalReferrals: 0,
+    totalEarned: 0,
+    pendingRewards: 0
+  });
+
+  useEffect(() => {
+    if (user) {
+      fetchReferralData();
+    }
+  }, [user]);
+
+  const fetchReferralData = async () => {
+    if (!user) return;
+
+    try {
+      // Get user's referral code
+      const { data: codeData } = await supabase
+        .from('user_referral_codes')
+        .select('referral_code')
+        .eq('user_id', user.id)
+        .single();
+
+      if (codeData) {
+        setReferralCode(codeData.referral_code);
+      }
+
+      // Get referral stats
+      const { data: referrals } = await supabase
+        .from('referrals')
+        .select('*')
+        .eq('referrer_id', user.id);
+
+      if (referrals) {
+        const totalReferrals = referrals.length;
+        const totalEarned = referrals
+          .filter(r => r.status === 'completed')
+          .reduce((sum, r) => sum + (r.reward_amount || 0), 0);
+        const pendingRewards = referrals
+          .filter(r => r.status === 'pending')
+          .reduce((sum, r) => sum + (r.reward_amount || 0), 0);
+
+        setReferralStats({
+          totalReferrals,
+          totalEarned,
+          pendingRewards
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching referral data:', error);
+    }
+  };
+
+  const referralLink = `${window.location.origin}?ref=${referralCode}`;
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(referralLink);
       setCopied(true);
+      toast.success('Referral link copied!');
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.log('Copy failed');
+      toast.error('Failed to copy link');
     }
   };
 
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Join GoodDeeds VPN',
+          text: 'Save data with GoodDeeds VPN! Use my referral code to get started.',
+          url: referralLink,
+        });
+      } catch (err) {
+        handleCopy();
+      }
+    } else {
+      handleCopy();
+    }
+  };
+
+  const formatAmount = (amount: number) => {
+    return `₦${(amount / 100).toLocaleString()}`;
+  };
+
   const badges = [
-    { name: '5GB Saved Champion', icon: '🏆', earned: true, requirement: 'Save 5GB total' },
-    { name: 'Referral Master', icon: '👑', earned: true, requirement: 'Refer 10 friends' },
-    { name: 'Data Saver Pro', icon: '⚡', earned: false, requirement: 'Save 10GB total' },
-    { name: 'Community Builder', icon: '🌟', earned: false, requirement: 'Refer 25 friends' }
+    { name: 'First Referral', icon: '🎯', earned: referralStats.totalReferrals >= 1, requirement: 'Refer 1 friend' },
+    { name: 'Referral Champion', icon: '👑', earned: referralStats.totalReferrals >= 5, requirement: 'Refer 5 friends' },
+    { name: 'Community Builder', icon: '🌟', earned: referralStats.totalReferrals >= 10, requirement: 'Refer 10 friends' },
+    { name: 'Ambassador', icon: '🏆', earned: referralStats.totalReferrals >= 25, requirement: 'Refer 25 friends' }
   ];
 
   const milestones = [
-    { friends: 1, reward: '500MB Free', achieved: true },
-    { friends: 5, reward: '2GB Free', achieved: true },
-    { friends: 10, reward: '5GB Free', achieved: false },
-    { friends: 25, reward: 'Free Monthly Plan', achieved: false }
+    { friends: 1, reward: '₦200', achieved: referralStats.totalReferrals >= 1 },
+    { friends: 5, reward: '₦1,000', achieved: referralStats.totalReferrals >= 5 },
+    { friends: 10, reward: '₦2,500', achieved: referralStats.totalReferrals >= 10 },
+    { friends: 25, reward: 'Free Monthly Plan', achieved: referralStats.totalReferrals >= 25 }
   ];
 
   return (
@@ -49,16 +127,20 @@ const ReferralScreen = () => {
         <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-6 border border-white/20">
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <div className="text-3xl font-bold text-white">7</div>
+              <div className="text-3xl font-bold text-white">{referralStats.totalReferrals}</div>
               <div className="text-blue-200 text-sm">Friends Referred</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-cyan-300">4.5GB</div>
-              <div className="text-blue-200 text-sm">Free Data Earned</div>
+              <div className="text-3xl font-bold text-cyan-300">
+                {formatAmount(referralStats.totalEarned)}
+              </div>
+              <div className="text-blue-200 text-sm">Total Earned</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-green-300">₦1,500</div>
-              <div className="text-blue-200 text-sm">Total Earned</div>
+              <div className="text-3xl font-bold text-green-300">
+                {formatAmount(referralStats.pendingRewards)}
+              </div>
+              <div className="text-blue-200 text-sm">Pending</div>
             </div>
           </div>
         </div>
@@ -91,7 +173,10 @@ const ReferralScreen = () => {
               {copied ? <Check size={16} /> : <Copy size={16} />}
               <span>{copied ? 'Copied!' : 'Copy Link'}</span>
             </button>
-            <button className="py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center space-x-2">
+            <button 
+              onClick={handleShare}
+              className="py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center space-x-2"
+            >
               <Share2 size={16} />
               <span>Share</span>
             </button>
@@ -112,7 +197,7 @@ const ReferralScreen = () => {
             </div>
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-bold">3</div>
-              <span>Both of you get free data!</span>
+              <span>Both of you get rewards!</span>
             </div>
           </div>
         </div>

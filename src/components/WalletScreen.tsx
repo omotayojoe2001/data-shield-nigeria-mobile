@@ -1,19 +1,96 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Wallet, CreditCard, History, Gift, Plus, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const WalletScreen = () => {
+  const { user, wallet, refreshWallet } = useAuth();
   const [selectedTopUp, setSelectedTopUp] = useState<number | null>(null);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [bonusLoading, setBonusLoading] = useState(false);
   
   const topUpAmounts = [500, 1000, 2000, 5000, 10000];
-  
-  const transactions = [
-    { id: 1, type: 'topup', amount: 2000, date: '2024-01-15', description: 'Card Top-up', status: 'completed' },
-    { id: 2, type: 'purchase', amount: -500, date: '2024-01-14', description: 'Weekly Plan', status: 'completed' },
-    { id: 3, type: 'bonus', amount: 200, date: '2024-01-13', description: 'Referral Bonus', status: 'completed' },
-    { id: 4, type: 'purchase', amount: -1000, date: '2024-01-12', description: '2GB Data Plan', status: 'completed' },
-    { id: 5, type: 'topup', amount: 5000, date: '2024-01-10', description: 'Bank Transfer', status: 'completed' }
-  ];
+
+  useEffect(() => {
+    if (user) {
+      fetchTransactions();
+    }
+  }, [user]);
+
+  const fetchTransactions = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      setTransactions(data || []);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      toast.error('Failed to load transactions');
+    }
+  };
+
+  const handleTopUp = async (amount: number) => {
+    if (!user || !selectedTopUp) return;
+    
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('initialize-payment', {
+        body: {
+          amount: amount,
+          email: user.email,
+          type: 'topup'
+        }
+      });
+
+      if (error) throw error;
+
+      // Redirect to Paystack
+      if (data.authorization_url) {
+        window.open(data.authorization_url, '_blank');
+      }
+    } catch (error) {
+      console.error('Payment initialization error:', error);
+      toast.error('Failed to initialize payment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClaimBonus = async () => {
+    setBonusLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('claim-daily-bonus');
+
+      if (error) throw error;
+
+      toast.success(data.message);
+      await refreshWallet();
+      await fetchTransactions();
+    } catch (error: any) {
+      console.error('Bonus claim error:', error);
+      toast.error(error.message || 'Failed to claim bonus');
+    } finally {
+      setBonusLoading(false);
+    }
+  };
+
+  const formatAmount = (amount: number) => {
+    return `₦${(amount / 100).toLocaleString()}`;
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-NG');
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white pb-24">
@@ -33,15 +110,17 @@ const WalletScreen = () => {
         <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-6 border border-white/20">
           <div className="text-center">
             <p className="text-blue-200 mb-2">Available Balance</p>
-            <h2 className="text-4xl font-bold text-white mb-4">₦3,750</h2>
+            <h2 className="text-4xl font-bold text-white mb-4">
+              {wallet ? formatAmount(wallet.balance) : '₦0'}
+            </h2>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-blue-200">This Month</p>
-                <p className="text-white font-semibold">₦8,200 spent</p>
+                <p className="text-white font-semibold">₦0 spent</p>
               </div>
               <div>
                 <p className="text-blue-200">Saved</p>
-                <p className="text-green-300 font-semibold">₦2,100</p>
+                <p className="text-green-300 font-semibold">₦0</p>
               </div>
             </div>
           </div>
@@ -51,7 +130,10 @@ const WalletScreen = () => {
       {/* Quick Actions */}
       <div className="px-6 mt-6">
         <div className="grid grid-cols-2 gap-4 mb-6">
-          <button className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-4 rounded-2xl shadow-lg flex items-center justify-center space-x-2 hover:shadow-xl transition-all duration-300">
+          <button 
+            onClick={() => setSelectedTopUp(1000)}
+            className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-4 rounded-2xl shadow-lg flex items-center justify-center space-x-2 hover:shadow-xl transition-all duration-300"
+          >
             <Plus size={20} />
             <span className="font-semibold">Top Up</span>
           </button>
@@ -84,30 +166,13 @@ const WalletScreen = () => {
             ))}
           </div>
 
-          <div className="space-y-3">
-            <button className="w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-2xl font-semibold hover:shadow-lg transition-all duration-300">
-              Pay with Card
-            </button>
-            <button className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl font-semibold hover:shadow-lg transition-all duration-300">
-              Bank Transfer
-            </button>
-            <button className="w-full py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-2xl font-semibold hover:shadow-lg transition-all duration-300">
-              USSD Payment
-            </button>
-          </div>
-        </div>
-
-        {/* Smart Reminders */}
-        <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-3xl p-6 text-white shadow-xl mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold mb-2">⚠️ Reminder</h3>
-              <p className="text-sm">Your subscription expires in 2 days</p>
-            </div>
-            <button className="bg-white/20 px-4 py-2 rounded-xl font-semibold hover:bg-white/30 transition-all duration-300">
-              Renew
-            </button>
-          </div>
+          <button 
+            onClick={() => selectedTopUp && handleTopUp(selectedTopUp)}
+            disabled={!selectedTopUp || loading}
+            className="w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-2xl font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Processing...' : 'Pay with Paystack'}
+          </button>
         </div>
 
         {/* Daily Bonus */}
@@ -120,8 +185,12 @@ const WalletScreen = () => {
                 <p className="text-sm">Claim your ₦50 bonus!</p>
               </div>
             </div>
-            <button className="bg-white/20 px-4 py-2 rounded-xl font-semibold hover:bg-white/30 transition-all duration-300">
-              Claim
+            <button 
+              onClick={handleClaimBonus}
+              disabled={bonusLoading}
+              className="bg-white/20 px-4 py-2 rounded-xl font-semibold hover:bg-white/30 transition-all duration-300 disabled:opacity-50"
+            >
+              {bonusLoading ? 'Claiming...' : 'Claim'}
             </button>
           </div>
         </div>
@@ -134,35 +203,35 @@ const WalletScreen = () => {
           </h3>
           
           <div className="space-y-3">
-            {transactions.slice(0, 5).map((transaction) => (
-              <div key={transaction.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-xl">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    transaction.type === 'topup' ? 'bg-green-100 text-green-600' :
-                    transaction.type === 'bonus' ? 'bg-purple-100 text-purple-600' :
-                    'bg-red-100 text-red-600'
+            {transactions.length > 0 ? (
+              transactions.map((transaction) => (
+                <div key={transaction.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-xl">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      transaction.type === 'topup' ? 'bg-green-100 text-green-600' :
+                      transaction.type === 'bonus' ? 'bg-purple-100 text-purple-600' :
+                      'bg-red-100 text-red-600'
+                    }`}>
+                      {transaction.type === 'topup' ? <ArrowDownLeft size={16} /> :
+                       transaction.type === 'bonus' ? <Gift size={16} /> :
+                       <ArrowUpRight size={16} />}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-blue-900">{transaction.description}</p>
+                      <p className="text-sm text-blue-600">{formatDate(transaction.created_at)}</p>
+                    </div>
+                  </div>
+                  <div className={`font-bold ${
+                    transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {transaction.type === 'topup' ? <ArrowDownLeft size={16} /> :
-                     transaction.type === 'bonus' ? <Gift size={16} /> :
-                     <ArrowUpRight size={16} />}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-blue-900">{transaction.description}</p>
-                    <p className="text-sm text-blue-600">{transaction.date}</p>
+                    {transaction.amount > 0 ? '+' : ''}{formatAmount(Math.abs(transaction.amount))}
                   </div>
                 </div>
-                <div className={`font-bold ${
-                  transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {transaction.amount > 0 ? '+' : ''}₦{Math.abs(transaction.amount).toLocaleString()}
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-center text-blue-600 py-8">No transactions yet</p>
+            )}
           </div>
-          
-          <button className="w-full mt-4 py-3 text-blue-600 font-semibold hover:bg-blue-50 rounded-xl transition-all duration-300">
-            View All Transactions
-          </button>
         </div>
       </div>
     </div>
