@@ -4,10 +4,17 @@ import SplashScreen from '../components/SplashScreen';
 import OnboardingScreen from '../components/OnboardingScreen';
 import AuthScreen from '../components/AuthScreen';
 import HomeScreen from '../components/HomeScreen';
+import PlansScreen from '../components/PlansScreen';
+import UsageScreen from '../components/UsageScreen';
+import WalletScreen from '../components/WalletScreen';
+import ReferralScreen from '../components/ReferralScreen';
+import SettingsScreen from '../components/SettingsScreen';
+import SupportScreen from '../components/SupportScreen';
 import AppNavigation from '../components/AppNavigation';
 
 const Index = () => {
-  const [currentScreen, setCurrentScreen] = useState<'splash' | 'onboarding' | 'auth' | 'home'>('splash');
+  const [currentScreen, setCurrentScreen] = useState<'splash' | 'onboarding' | 'auth' | 'main'>('splash');
+  const [activeTab, setActiveTab] = useState('home');
 
   const handleSplashComplete = () => {
     setCurrentScreen('onboarding');
@@ -18,7 +25,28 @@ const Index = () => {
   };
 
   const handleAuthComplete = () => {
-    setCurrentScreen('home');
+    setCurrentScreen('main');
+  };
+
+  const renderMainContent = () => {
+    switch (activeTab) {
+      case 'home':
+        return <HomeScreen />;
+      case 'plans':
+        return <PlansScreen />;
+      case 'usage':
+        return <UsageScreen />;
+      case 'wallet':
+        return <WalletScreen />;
+      case 'referral':
+        return <ReferralScreen />;
+      case 'settings':
+        return <SettingsScreen />;
+      case 'support':
+        return <SupportScreen />;
+      default:
+        return <HomeScreen />;
+    }
   };
 
   return (
@@ -35,10 +63,10 @@ const Index = () => {
         <AuthScreen onComplete={handleAuthComplete} />
       )}
       
-      {currentScreen === 'home' && (
+      {currentScreen === 'main' && (
         <>
-          <HomeScreen />
-          <AppNavigation />
+          {renderMainContent()}
+          <AppNavigation activeTab={activeTab} onTabChange={setActiveTab} />
         </>
       )}
     </div>
