@@ -1,12 +1,46 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React, { useState } from 'react';
+import SplashScreen from '../components/SplashScreen';
+import OnboardingScreen from '../components/OnboardingScreen';
+import AuthScreen from '../components/AuthScreen';
+import HomeScreen from '../components/HomeScreen';
+import AppNavigation from '../components/AppNavigation';
 
 const Index = () => {
+  const [currentScreen, setCurrentScreen] = useState<'splash' | 'onboarding' | 'auth' | 'home'>('splash');
+
+  const handleSplashComplete = () => {
+    setCurrentScreen('onboarding');
+  };
+
+  const handleOnboardingComplete = () => {
+    setCurrentScreen('auth');
+  };
+
+  const handleAuthComplete = () => {
+    setCurrentScreen('home');
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-white">
+      {currentScreen === 'splash' && (
+        <SplashScreen onComplete={handleSplashComplete} />
+      )}
+      
+      {currentScreen === 'onboarding' && (
+        <OnboardingScreen onComplete={handleOnboardingComplete} />
+      )}
+      
+      {currentScreen === 'auth' && (
+        <AuthScreen onComplete={handleAuthComplete} />
+      )}
+      
+      {currentScreen === 'home' && (
+        <>
+          <HomeScreen />
+          <AppNavigation />
+        </>
+      )}
     </div>
   );
 };
