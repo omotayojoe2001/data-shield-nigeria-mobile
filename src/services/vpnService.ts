@@ -16,7 +16,17 @@ interface VPNStats {
   dataSaved: number; // in MB
   downloadSpeed: number; // in Mbps
   uploadSpeed: number; // in Mbps
+  location?: string; // VPN server location
+  speed?: string; // formatted speed string
   connectedSince?: Date;
+}
+
+interface CurrentPlan {
+  type: 'payg' | 'data' | 'subscription' | 'none';
+  isActive: boolean;
+  totalMB: number;
+  usedMB: number;
+  expiryDate?: string;
 }
 
 class VPNService {
@@ -25,7 +35,16 @@ class VPNService {
     dataUsed: 0,
     dataSaved: 0,
     downloadSpeed: 0,
-    uploadSpeed: 0
+    uploadSpeed: 0,
+    location: 'Lagos, Nigeria',
+    speed: '0 Mbps'
+  };
+
+  private currentPlan: CurrentPlan = {
+    type: 'none',
+    isActive: false,
+    totalMB: 0,
+    usedMB: 0
   };
 
   private dataUsageInterval?: NodeJS.Timeout;
@@ -39,6 +58,8 @@ class VPNService {
     this.stats.connectedSince = new Date();
     this.stats.downloadSpeed = 12.5;
     this.stats.uploadSpeed = 8.3;
+    this.stats.location = 'Lagos, Nigeria';
+    this.stats.speed = '12.5 Mbps';
     
     // Start simulating data usage
     this.startDataUsageSimulation();
@@ -51,6 +72,7 @@ class VPNService {
     this.stats.isConnected = false;
     this.stats.downloadSpeed = 0;
     this.stats.uploadSpeed = 0;
+    this.stats.speed = '0 Mbps';
     this.stats.connectedSince = undefined;
     
     // Stop simulating data usage
@@ -62,6 +84,48 @@ class VPNService {
 
   getStats(): VPNStats {
     return { ...this.stats };
+  }
+
+  getCurrentPlan(): CurrentPlan {
+    // Check if user has active plans from billing service
+    const billingData = JSON.parse(localStorage.getItem('billing-data') || '{}');
+    
+    if (billingData.payAsYouGoActive) {
+      this.currentPlan = {
+        type: 'payg',
+        isActive: true,
+        totalMB: 0,
+        usedMB: 0
+      };
+    } else if (billingData.activePlans && billingData.activePlans.length > 0) {
+      const activePlan = billingData.activePlans[0];
+      if (activePlan.type === 'data') {
+        this.currentPlan = {
+          type: 'data',
+          isActive: true,
+          totalMB: activePlan.dataMB,
+          usedMB: activePlan.usedMB || 0,
+          expiryDate: activePlan.expiryDate
+        };
+      } else if (activePlan.type === 'subscription') {
+        this.currentPlan = {
+          type: 'subscription',
+          isActive: true,
+          totalMB: activePlan.dataMB,
+          usedMB: activePlan.usedMB || 0,
+          expiryDate: activePlan.expiryDate
+        };
+      }
+    } else {
+      this.currentPlan = {
+        type: 'none',
+        isActive: false,
+        totalMB: 0,
+        usedMB: 0
+      };
+    }
+
+    return { ...this.currentPlan };
   }
 
   private startDataUsageSimulation() {
@@ -87,6 +151,7 @@ class VPNService {
       if (this.stats.isConnected) {
         this.stats.downloadSpeed = 10 + Math.random() * 10;
         this.stats.uploadSpeed = 6 + Math.random() * 6;
+        this.stats.speed = `${this.stats.downloadSpeed.toFixed(1)} Mbps`;
       }
     }, 5000);
   }
@@ -135,4 +200,4 @@ class VPNService {
 }
 
 export const vpnService = new VPNService();
-export type { VPNStats };
+export type { VPNStats, CurrentPlan };
