@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
-import { Shield, Clock, Zap, CheckCircle, Star } from 'lucide-react';
+import { Shield, Clock, Zap, CheckCircle, Star, Wallet } from 'lucide-react';
+import { PAYG_RATE } from '../services/billingService';
 
 const PlansScreen = () => {
-  const [selectedTab, setSelectedTab] = useState<'subscription' | 'data'>('subscription');
+  const [selectedTab, setSelectedTab] = useState<'subscription' | 'data' | 'payg'>('payg');
 
   const subscriptionPlans = [
     {
@@ -56,7 +57,18 @@ const PlansScreen = () => {
       {/* Tab Selector */}
       <div className="px-6 mt-6">
         <div className="bg-white rounded-2xl p-2 shadow-lg border border-blue-100">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => setSelectedTab('payg')}
+              className={`py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
+                selectedTab === 'payg'
+                  ? 'bg-blue-900 text-white shadow-lg'
+                  : 'text-blue-600 hover:bg-blue-50'
+              }`}
+            >
+              <Wallet size={20} className="inline mr-2" />
+              Pay-As-You-Go
+            </button>
             <button
               onClick={() => setSelectedTab('subscription')}
               className={`py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
@@ -82,6 +94,66 @@ const PlansScreen = () => {
           </div>
         </div>
       </div>
+
+      {/* Pay-As-You-Go */}
+      {selectedTab === 'payg' && (
+        <div className="px-6 mt-6">
+          <div className="bg-white rounded-3xl p-6 shadow-xl border border-blue-100 mb-6">
+            <div className="text-center mb-6">
+              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-4">
+                <Wallet size={40} className="text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-blue-900 mb-2">Pay-As-You-Go</h3>
+              <p className="text-blue-600">Only pay for what you use</p>
+            </div>
+
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 mb-6">
+              <div className="text-center">
+                <div className="text-4xl font-bold text-green-600 mb-2">₦{(PAYG_RATE / 100).toFixed(2)}</div>
+                <div className="text-lg text-green-700 font-semibold">per MB</div>
+                <div className="text-sm text-green-600 mt-2">₦200 per GB • No commitments</div>
+              </div>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center space-x-3">
+                <CheckCircle size={20} className="text-green-500" />
+                <span className="text-blue-700">Only pay for data you actually use</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <CheckCircle size={20} className="text-green-500" />
+                <span className="text-blue-700">No monthly commitments or contracts</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <CheckCircle size={20} className="text-green-500" />
+                <span className="text-blue-700">Automatic wallet deduction</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <CheckCircle size={20} className="text-green-500" />
+                <span className="text-blue-700">Real-time usage tracking</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <CheckCircle size={20} className="text-green-500" />
+                <span className="text-blue-700">Up to 70% data savings with compression</span>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 rounded-xl p-4 mb-6">
+              <h4 className="font-semibold text-blue-900 mb-2">How it works:</h4>
+              <ol className="text-sm text-blue-700 space-y-1">
+                <li>1. Top up your wallet with any amount</li>
+                <li>2. Connect to VPN and start browsing</li>
+                <li>3. Pay ₦0.20 per MB of compressed data used</li>
+                <li>4. Save up to 70% compared to direct usage</li>
+              </ol>
+            </div>
+
+            <button className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl font-semibold text-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+              Start Using Pay-As-You-Go
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Subscription Plans */}
       {selectedTab === 'subscription' && (

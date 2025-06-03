@@ -29,11 +29,11 @@ serve(async (req) => {
       throw new Error("Unauthorized");
     }
 
-    // Initialize Paystack payment
+    // Initialize Paystack payment with test key
     const paystackResponse = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${Deno.env.get("PAYSTACK_SECRET_KEY")}`,
+        "Authorization": `Bearer sk_test_3b4296afe558d06a3166d41b24283bdf5d9afee7`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

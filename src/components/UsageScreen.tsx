@@ -1,27 +1,44 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingDown, Smartphone, Globe, Settings, Eye, EyeOff } from 'lucide-react';
+import { vpnService } from '../services/vpnService';
+import { billingService, PAYG_RATE } from '../services/billingService';
 
 const UsageScreen = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month'>('day');
   const [showDetails, setShowDetails] = useState(true);
+  const [vpnStats, setVpnStats] = useState(vpnService.getStats());
 
-  const appUsage = [
-    { name: 'WhatsApp', used: '45MB', saved: '28MB', icon: '💬', color: 'bg-green-500' },
-    { name: 'Instagram', used: '89MB', saved: '62MB', icon: '📷', color: 'bg-pink-500' },
-    { name: 'YouTube', used: '156MB', saved: '94MB', icon: '📺', color: 'bg-red-500' },
-    { name: 'Chrome', used: '67MB', saved: '41MB', icon: '🌐', color: 'bg-blue-500' },
-    { name: 'TikTok', used: '123MB', saved: '78MB', icon: '🎵', color: 'bg-black' },
-    { name: 'Facebook', used: '34MB', saved: '21MB', icon: '👥', color: 'bg-blue-600' }
-  ];
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVpnStats(vpnService.getStats());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const appUsage = vpnService.getAppUsage();
 
   const periodData = {
-    day: { total: '485MB', saved: '324MB', percentage: 67 },
-    week: { total: '2.1GB', saved: '1.4GB', percentage: 68 },
-    month: { total: '8.7GB', saved: '5.9GB', percentage: 68 }
+    day: { 
+      total: `${(vpnStats.dataUsed + vpnStats.dataSaved).toFixed(0)}MB`, 
+      saved: `${vpnStats.dataSaved.toFixed(0)}MB`, 
+      percentage: vpnStats.dataUsed > 0 ? Math.round((vpnStats.dataSaved / (vpnStats.dataUsed + vpnStats.dataSaved)) * 100) : 68 
+    },
+    week: { 
+      total: `${((vpnStats.dataUsed + vpnStats.dataSaved) * 7 / 1000).toFixed(1)}GB`, 
+      saved: `${(vpnStats.dataSaved * 7 / 1000).toFixed(1)}GB`, 
+      percentage: vpnStats.dataUsed > 0 ? Math.round((vpnStats.dataSaved / (vpnStats.dataUsed + vpnStats.dataSaved)) * 100) : 68 
+    },
+    month: { 
+      total: `${((vpnStats.dataUsed + vpnStats.dataSaved) * 30 / 1000).toFixed(1)}GB`, 
+      saved: `${(vpnStats.dataSaved * 30 / 1000).toFixed(1)}GB`, 
+      percentage: vpnStats.dataUsed > 0 ? Math.round((vpnStats.dataSaved / (vpnStats.dataUsed + vpnStats.dataSaved)) * 100) : 68 
+    }
   };
 
   const currentData = periodData[selectedPeriod];
+  const totalCostToday = billingService.calculateDataCost(vpnStats.dataUsed);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white pb-24">
@@ -82,6 +99,17 @@ const UsageScreen = () => {
             </div>
           </div>
 
+          {/* Pay-As-You-Go Info */}
+          {selectedPeriod === 'day' && (
+            <div className="bg-blue-50 rounded-xl p-3 mb-4">
+              <div className="text-center">
+                <div className="text-lg font-bold text-blue-900">₦{(totalCostToday / 100).toFixed(2)}</div>
+                <div className="text-sm text-blue-600">Spent today (Pay-As-You-Go)</div>
+                <div className="text-xs text-blue-500 mt-1">₦{(PAYG_RATE / 100).toFixed(2)} per MB • ₦200 per GB</div>
+              </div>
+            </div>
+          )}
+
           {/* Savings Gauge */}
           <div className="relative w-32 h-32 mx-auto mb-4">
             <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
@@ -114,7 +142,7 @@ const UsageScreen = () => {
           </div>
 
           <p className="text-center text-blue-600">
-            Excellent! You're saving {currentData.percentage}% of your data usage.
+            {currentData.percentage >= 60 ? 'Excellent!' : 'Good!'} You're saving {currentData.percentage}% of your data usage.
           </p>
         </div>
 
@@ -163,16 +191,16 @@ const UsageScreen = () => {
           </h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold">1.2GB</div>
+              <div className="text-2xl font-bold">{((vpnStats.dataUsed + vpnStats.dataSaved) * 2).toFixed(0)}MB</div>
               <div className="text-cyan-100">Without VPN</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold">485MB</div>
+              <div className="text-2xl font-bold">{vpnStats.dataUsed.toFixed(0)}MB</div>
               <div className="text-cyan-100">With VPN</div>
             </div>
           </div>
           <div className="mt-4 text-center">
-            <div className="text-sm text-cyan-100">You saved 715MB today!</div>
+            <div className="text-sm text-cyan-100">You saved {vpnStats.dataSaved.toFixed(0)}MB today!</div>
           </div>
         </div>
       </div>

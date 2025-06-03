@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -96,7 +95,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const getSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Session error:', error);
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -117,16 +120,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
+        
         setSession(session);
         setUser(session?.user ?? null);
         
         if (event === 'SIGNED_IN' && session?.user) {
+          // Small delay to ensure data is ready
           setTimeout(async () => {
             await Promise.all([
               fetchProfile(session.user.id),
               fetchWallet(session.user.id)
             ]);
-          }, 0);
+          }, 100);
         } else if (event === 'SIGNED_OUT') {
           setProfile(null);
           setWallet(null);
@@ -141,16 +147,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
-      cleanupAuthState();
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { full_name: fullName }
+          data: { full_name: fullName },
+          emailRedirectTo: `${window.location.origin}/`
         }
       });
+      
+      console.log('Signup response:', { data, error });
       return { error };
     } catch (error) {
+      console.error('Signup error:', error);
       return { error };
     }
   };
@@ -158,32 +167,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     try {
       cleanupAuthState();
-      try {
-        await supabase.auth.signOut({ scope: 'global' });
-      } catch (err) {
-        // Continue even if this fails
-      }
       
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
-      if (!error) {
-        window.location.href = '/';
+      console.log('Signin response:', { data, error });
+      
+      if (error) {
+        return { error };
       }
       
-      return { error };
+      // Don't force redirect - let the auth state change handle it
+      return { error: null };
     } catch (error) {
+      console.error('Signin error:', error);
       return { error };
     }
   };
 
   const signOut = async () => {
     try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
       cleanupAuthState();
-      await supabase.auth.signOut({ scope: 'global' });
-      window.location.href = '/';
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      setWallet(null);
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -191,7 +204,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const resetPassword = async (email: string) => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      });
       return { error };
     } catch (error) {
       return { error };
