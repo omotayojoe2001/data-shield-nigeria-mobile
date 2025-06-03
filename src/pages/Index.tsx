@@ -25,13 +25,15 @@ const Index = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const reference = urlParams.get('reference');
     const status = urlParams.get('status');
+    const trxref = urlParams.get('trxref');
     
-    if (reference && status === 'success') {
+    if ((reference && status === 'success') || trxref) {
+      console.log('Paystack success detected, refreshing wallet and navigating to wallet');
       // Clear the URL params
       window.history.replaceState({}, document.title, window.location.pathname);
       // Refresh wallet to show updated balance
       refreshWallet();
-      // Navigate to wallet tab
+      // Navigate to wallet tab and ensure main screen is shown
       setActiveTab('wallet');
       setCurrentScreen('main');
     }

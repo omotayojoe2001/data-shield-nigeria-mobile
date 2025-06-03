@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { vpnService } from '../services/vpnService';
@@ -164,13 +165,19 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <button className="bg-white rounded-2xl p-4 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300">
+          <button 
+            onClick={() => onTabChange('referral')}
+            className="bg-white rounded-2xl p-4 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300"
+          >
             <div className="text-red-600 text-3xl mb-2">🛡️</div>
             <h4 className="font-semibold text-blue-900">Refer a Friend</h4>
             <p className="text-blue-600 text-sm">Earn rewards</p>
           </button>
           
-          <button className="bg-white rounded-2xl p-4 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300">
+          <button 
+            onClick={() => onTabChange('settings')}
+            className="bg-white rounded-2xl p-4 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300"
+          >
             <div className="text-purple-600 text-3xl mb-2">⚙️</div>
             <h4 className="font-semibold text-blue-900">Settings</h4>
             <p className="text-blue-600 text-sm">App preferences</p>
