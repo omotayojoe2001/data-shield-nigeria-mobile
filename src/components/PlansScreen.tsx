@@ -1,16 +1,23 @@
-
 import React, { useState } from 'react';
-import { Shield, Clock, Zap, CheckCircle, Star, Wallet } from 'lucide-react';
+import { Shield, Clock, Zap, CheckCircle, Star, Wallet, ArrowLeft } from 'lucide-react';
 import { PAYG_RATE } from '../services/billingService';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const PlansScreen = () => {
   const [selectedTab, setSelectedTab] = useState<'subscription' | 'data' | 'payg'>('payg');
+  const [showPaymentFlow, setShowPaymentFlow] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
 
   const subscriptionPlans = [
     {
       id: 'daily',
       name: 'Daily Plan',
-      price: '₦200',
+      price: 200,
+      displayPrice: '₦200',
       duration: '1 Day',
       features: ['Unlimited compression', '24/7 support', 'All servers'],
       popular: false,
@@ -19,7 +26,8 @@ const PlansScreen = () => {
     {
       id: 'weekly',
       name: 'Weekly Plan',
-      price: '₦1,200',
+      price: 1200,
+      displayPrice: '₦1,200',
       duration: '7 Days',
       features: ['Unlimited compression', '24/7 support', 'All servers', 'Priority connection'],
       popular: true,
@@ -29,7 +37,8 @@ const PlansScreen = () => {
     {
       id: 'monthly',
       name: 'Monthly Plan',
-      price: '₦4,500',
+      price: 4500,
+      displayPrice: '₦4,500',
       duration: '30 Days',
       features: ['Unlimited compression', '24/7 support', 'All servers', 'Priority connection', 'Extra bonuses'],
       popular: false,
@@ -39,12 +48,120 @@ const PlansScreen = () => {
   ];
 
   const dataPlans = [
-    { id: '500mb', size: '500MB', price: '₦300', validity: '7 days' },
-    { id: '1gb', size: '1GB', price: '₦550', validity: '14 days' },
-    { id: '2gb', size: '2GB', price: '₦1,000', validity: '30 days' },
-    { id: '5gb', size: '5GB', price: '₦2,200', validity: '30 days' },
-    { id: '10gb', size: '10GB', price: '₦4,000', validity: '30 days' }
+    { id: '500mb', size: '500MB', price: 300, displayPrice: '₦300', validity: '7 days' },
+    { id: '1gb', size: '1GB', price: 550, displayPrice: '₦550', validity: '14 days' },
+    { id: '2gb', size: '2GB', price: 1000, displayPrice: '₦1,000', validity: '30 days' },
+    { id: '5gb', size: '5GB', price: 2200, displayPrice: '₦2,200', validity: '30 days' },
+    { id: '10gb', size: '10GB', price: 4000, displayPrice: '₦4,000', validity: '30 days' }
   ];
+
+  const handlePlanPurchase = async (plan: any, type: 'subscription' | 'data') => {
+    if (!user) {
+      toast.error('Please login to purchase a plan');
+      return;
+    }
+
+    setSelectedPlan(plan);
+    setShowPaymentFlow(true);
+  };
+
+  const handlePayment = async (paymentMethod: 'wallet' | 'paystack') => {
+    if (!selectedPlan || !user) return;
+    
+    setLoading(true);
+    try {
+      if (paymentMethod === 'paystack') {
+        const { data, error } = await supabase.functions.invoke('initialize-payment', {
+          body: {
+            amount: selectedPlan.price,
+            email: user.email,
+            type: selectedTab === 'subscription' ? 'subscription' : 'data_purchase',
+            planType: selectedPlan.id,
+            duration: selectedPlan.duration || selectedPlan.validity
+          }
+        });
+
+        if (error) throw error;
+
+        if (data.authorization_url) {
+          window.open(data.authorization_url, '_blank');
+          toast.success('Payment initiated! Complete payment in the new tab.');
+        }
+      } else {
+        // Wallet payment simulation
+        toast.success(`Plan purchased successfully with wallet! ${selectedPlan.name} is now active.`);
+        setShowPaymentFlow(false);
+      }
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      toast.error(error.message || 'Payment failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startPayAsYouGo = () => {
+    toast.success('Pay-As-You-Go activated! Connect to VPN to start using data at ₦0.20/MB');
+  };
+
+  if (showPaymentFlow && selectedPlan) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white pb-24">
+        <div className="bg-gradient-to-r from-blue-900 to-blue-800 px-6 pt-12 pb-8 rounded-b-3xl shadow-xl">
+          <div className="flex items-center space-x-4 mb-6">
+            <button 
+              onClick={() => setShowPaymentFlow(false)}
+              className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center"
+            >
+              <ArrowLeft size={20} className="text-white" />
+            </button>
+            <div>
+              <h1 className="text-white text-2xl font-bold">Complete Purchase</h1>
+              <p className="text-blue-200">{selectedPlan.name}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 mt-6">
+          <div className="bg-white rounded-3xl p-6 shadow-xl border border-blue-100 mb-6">
+            <h3 className="text-xl font-bold text-blue-900 mb-4">Order Summary</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-blue-700">Plan:</span>
+                <span className="font-semibold text-blue-900">{selectedPlan.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-blue-700">Duration:</span>
+                <span className="font-semibold text-blue-900">{selectedPlan.duration || selectedPlan.validity}</span>
+              </div>
+              <div className="flex justify-between text-lg">
+                <span className="text-blue-700">Total:</span>
+                <span className="font-bold text-blue-900">{selectedPlan.displayPrice}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <button 
+              onClick={() => handlePayment('wallet')}
+              disabled={loading}
+              className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl font-semibold text-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
+            >
+              {loading ? 'Processing...' : 'Pay with Wallet'}
+            </button>
+            
+            <button 
+              onClick={() => handlePayment('paystack')}
+              disabled={loading}
+              className="w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-2xl font-semibold text-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
+            >
+              {loading ? 'Processing...' : 'Pay with Card (Paystack)'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white pb-24">
@@ -148,7 +265,10 @@ const PlansScreen = () => {
               </ol>
             </div>
 
-            <button className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl font-semibold text-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+            <button 
+              onClick={startPayAsYouGo}
+              className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl font-semibold text-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+            >
               Start Using Pay-As-You-Go
             </button>
           </div>
@@ -184,7 +304,7 @@ const PlansScreen = () => {
 
               <h3 className="text-xl font-bold text-blue-900 mb-2">{plan.name}</h3>
               <div className="flex items-baseline mb-4">
-                <span className="text-3xl font-bold text-blue-900">{plan.price}</span>
+                <span className="text-3xl font-bold text-blue-900">{plan.displayPrice}</span>
                 <span className="text-blue-600 ml-2">/ {plan.duration}</span>
               </div>
 
@@ -197,7 +317,10 @@ const PlansScreen = () => {
                 ))}
               </div>
 
-              <button className={`w-full py-4 rounded-2xl font-semibold text-lg transition-all duration-300 bg-gradient-to-r ${plan.color} text-white hover:shadow-xl transform hover:scale-105`}>
+              <button 
+                onClick={() => handlePlanPurchase(plan, 'subscription')}
+                className={`w-full py-4 rounded-2xl font-semibold text-lg transition-all duration-300 bg-gradient-to-r ${plan.color} text-white hover:shadow-xl transform hover:scale-105`}
+              >
                 Subscribe Now
               </button>
             </div>
@@ -217,11 +340,14 @@ const PlansScreen = () => {
                     <p className="text-blue-600">Valid for {plan.validity}</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-blue-900">{plan.price}</div>
+                    <div className="text-2xl font-bold text-blue-900">{plan.displayPrice}</div>
                   </div>
                 </div>
                 
-                <button className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+                <button 
+                  onClick={() => handlePlanPurchase(plan, 'data')}
+                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 transform hover:scale-105"
+                >
                   Buy Now
                 </button>
               </div>

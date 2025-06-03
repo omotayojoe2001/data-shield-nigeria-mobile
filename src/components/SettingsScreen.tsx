@@ -1,18 +1,34 @@
 
 import React, { useState } from 'react';
 import { Settings, User, Lock, Globe, Bell, Palette, HelpCircle, Shield, LogOut } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import ProfileScreen from './ProfileScreen';
 
 const SettingsScreen = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [language, setLanguage] = useState('English');
+  const [showProfile, setShowProfile] = useState(false);
+  const { user, profile, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
+  if (showProfile) {
+    return <ProfileScreen onBack={() => setShowProfile(false)} />;
+  }
 
   const settingsGroups = [
     {
       title: 'Account',
       items: [
-        { icon: User, label: 'Profile Settings', subtitle: 'Name, email, phone', action: () => {} },
-        { icon: Lock, label: 'Change Password', subtitle: 'Update your password', action: () => {} },
+        { icon: User, label: 'Profile Settings', subtitle: 'Name, email, phone', action: () => setShowProfile(true) },
+        { icon: Lock, label: 'Change Password', subtitle: 'Update your password', action: () => setShowProfile(true) },
         { icon: Shield, label: 'Privacy & Security', subtitle: 'Manage your privacy', action: () => {} }
       ]
     },
@@ -76,8 +92,8 @@ const SettingsScreen = () => {
               <User size={32} className="text-white" />
             </div>
             <div>
-              <h3 className="text-white text-xl font-bold">John Doe</h3>
-              <p className="text-blue-200">john.doe@email.com</p>
+              <h3 className="text-white text-xl font-bold">{profile?.full_name || 'User'}</h3>
+              <p className="text-blue-200">{user?.email}</p>
               <p className="text-cyan-300 text-sm">Premium Member</p>
             </div>
           </div>
@@ -185,7 +201,10 @@ const SettingsScreen = () => {
 
         {/* Logout Button */}
         <div className="bg-white rounded-3xl p-6 shadow-xl border border-red-200">
-          <button className="w-full flex items-center justify-center space-x-3 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl font-semibold hover:shadow-lg transition-all duration-300">
+          <button 
+            onClick={handleSignOut}
+            className="w-full flex items-center justify-center space-x-3 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl font-semibold hover:shadow-lg transition-all duration-300"
+          >
             <LogOut size={20} />
             <span>Logout</span>
           </button>

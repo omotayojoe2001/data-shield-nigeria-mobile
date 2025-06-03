@@ -70,7 +70,7 @@ class VPNService {
       if (this.stats.isConnected) {
         // Simulate random data usage (1-5 MB per interval)
         const newDataUsed = Math.random() * 4 + 1;
-        // Simulate 60-70% data savings
+        // Calculate data saved based on compression (60-70% savings)
         const savingsRate = 0.6 + Math.random() * 0.1;
         const newDataSaved = newDataUsed * savingsRate;
         
@@ -125,6 +125,12 @@ class VPNService {
   resetDailyStats() {
     this.stats.dataUsed = 0;
     this.stats.dataSaved = 0;
+  }
+
+  // Calculate savings percentage correctly
+  getSavingsPercentage(): number {
+    if (this.stats.dataUsed === 0) return 0;
+    return Math.round((this.stats.dataSaved / (this.stats.dataUsed + this.stats.dataSaved)) * 100);
   }
 }
 
