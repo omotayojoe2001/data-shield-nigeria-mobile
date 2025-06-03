@@ -1,15 +1,11 @@
 
 import React, { useState } from 'react';
-import { User, Camera, Lock, Phone, Mail, Save, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { User, Camera, Lock, Phone, Mail, Save, Eye, EyeOff, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
-interface ProfileScreenProps {
-  onBack: () => void;
-}
-
-const ProfileScreen = ({ onBack }: ProfileScreenProps) => {
-  const { user, profile, updateProfile } = useAuth();
+const ProfileScreen = () => {
+  const { user, profile, updateProfile, signOut } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -77,21 +73,29 @@ const ProfileScreen = ({ onBack }: ProfileScreenProps) => {
     toast.success('Profile photo updated! (Demo)');
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white pb-24">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-900 to-blue-800 px-6 pt-12 pb-8 rounded-b-3xl shadow-xl">
-        <div className="flex items-center space-x-4 mb-6">
-          <button 
-            onClick={onBack}
-            className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center"
-          >
-            <ArrowLeft size={20} className="text-white" />
-          </button>
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-white text-2xl font-bold">Profile Settings</h1>
             <p className="text-blue-200">Manage your account information</p>
           </div>
+          <button 
+            onClick={handleSignOut}
+            className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center"
+          >
+            <LogOut size={20} className="text-red-300" />
+          </button>
         </div>
 
         {/* Profile Photo Section */}
@@ -247,6 +251,17 @@ const ProfileScreen = ({ onBack }: ProfileScreenProps) => {
               <span>{loading ? 'Updating...' : 'Update Password'}</span>
             </button>
           </div>
+        </div>
+
+        {/* Logout Button */}
+        <div className="bg-white rounded-3xl p-6 shadow-xl border border-red-200">
+          <button 
+            onClick={handleSignOut}
+            className="w-full flex items-center justify-center space-x-3 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl font-semibold hover:shadow-lg transition-all duration-300"
+          >
+            <LogOut size={20} />
+            <span>Logout</span>
+          </button>
         </div>
       </div>
     </div>

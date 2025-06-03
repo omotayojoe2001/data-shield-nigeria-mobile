@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import SplashScreen from '../components/SplashScreen';
 import OnboardingScreen from '../components/OnboardingScreen';
@@ -8,15 +8,34 @@ import HomeScreen from '../components/HomeScreen';
 import PlansScreen from '../components/PlansScreen';
 import UsageScreen from '../components/UsageScreen';
 import WalletScreen from '../components/WalletScreen';
+import ProfileScreen from '../components/ProfileScreen';
 import ReferralScreen from '../components/ReferralScreen';
 import SettingsScreen from '../components/SettingsScreen';
 import SupportScreen from '../components/SupportScreen';
+import CurrentPlanScreen from '../components/CurrentPlanScreen';
 import AppNavigation from '../components/AppNavigation';
 
 const Index = () => {
   const [currentScreen, setCurrentScreen] = useState<'splash' | 'onboarding' | 'auth' | 'main'>('splash');
   const [activeTab, setActiveTab] = useState('home');
-  const { user, loading } = useAuth();
+  const { user, loading, refreshWallet } = useAuth();
+
+  // Handle Paystack success redirect
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const reference = urlParams.get('reference');
+    const status = urlParams.get('status');
+    
+    if (reference && status === 'success') {
+      // Clear the URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Refresh wallet to show updated balance
+      refreshWallet();
+      // Navigate to wallet tab
+      setActiveTab('wallet');
+      setCurrentScreen('main');
+    }
+  }, [refreshWallet]);
 
   const handleSplashComplete = () => {
     setCurrentScreen('onboarding');
@@ -68,6 +87,10 @@ const Index = () => {
         return <UsageScreen />;
       case 'wallet':
         return <WalletScreen />;
+      case 'profile':
+        return <ProfileScreen />;
+      case 'current-plan':
+        return <CurrentPlanScreen onBack={() => setActiveTab('home')} />;
       case 'referral':
         return <ReferralScreen />;
       case 'settings':

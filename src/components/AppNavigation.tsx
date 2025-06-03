@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Home, Shield, BarChart3, Wallet, Users, Settings, MessageCircle } from 'lucide-react';
+import { Home, Shield, BarChart3, Wallet, Users, Settings, MessageCircle, User } from 'lucide-react';
 
 interface AppNavigationProps {
   activeTab: string;
@@ -13,7 +13,7 @@ const AppNavigation = ({ activeTab, onTabChange }: AppNavigationProps) => {
     { id: 'plans', label: 'Plans', icon: Shield },
     { id: 'usage', label: 'Usage', icon: BarChart3 },
     { id: 'wallet', label: 'Wallet', icon: Wallet },
-    { id: 'referral', label: 'Referral', icon: Users },
+    { id: 'profile', label: 'Profile', icon: User },
     { id: 'settings', label: 'Settings', icon: Settings },
     { id: 'support', label: 'Support', icon: MessageCircle },
   ];

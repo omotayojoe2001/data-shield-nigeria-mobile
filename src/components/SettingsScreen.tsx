@@ -1,15 +1,13 @@
 
 import React, { useState } from 'react';
-import { Settings, User, Lock, Globe, Bell, Palette, HelpCircle, Shield, LogOut } from 'lucide-react';
+import { Settings, Lock, Globe, Bell, Palette, HelpCircle, Shield, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import ProfileScreen from './ProfileScreen';
 
 const SettingsScreen = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [language, setLanguage] = useState('English');
-  const [showProfile, setShowProfile] = useState(false);
-  const { user, profile, signOut } = useAuth();
+  const { signOut } = useAuth();
 
   const handleSignOut = async () => {
     try {
@@ -19,16 +17,11 @@ const SettingsScreen = () => {
     }
   };
 
-  if (showProfile) {
-    return <ProfileScreen onBack={() => setShowProfile(false)} />;
-  }
-
   const settingsGroups = [
     {
-      title: 'Account',
+      title: 'Security',
       items: [
-        { icon: User, label: 'Profile Settings', subtitle: 'Name, email, phone', action: () => setShowProfile(true) },
-        { icon: Lock, label: 'Change Password', subtitle: 'Update your password', action: () => setShowProfile(true) },
+        { icon: Lock, label: 'Change Password', subtitle: 'Update your password', action: () => {} },
         { icon: Shield, label: 'Privacy & Security', subtitle: 'Manage your privacy', action: () => {} }
       ]
     },
@@ -82,23 +75,6 @@ const SettingsScreen = () => {
           </div>
           <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
             <Settings size={24} className="text-white" />
-          </div>
-        </div>
-
-        {/* Profile Preview */}
-        <div 
-          onClick={() => setShowProfile(true)}
-          className="bg-white/10 backdrop-blur-sm rounded-3xl p-6 border border-white/20 cursor-pointer hover:bg-white/20 transition-all duration-300"
-        >
-          <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-2xl flex items-center justify-center">
-              <User size={32} className="text-white" />
-            </div>
-            <div>
-              <h3 className="text-white text-xl font-bold">{profile?.full_name || 'User'}</h3>
-              <p className="text-blue-200">{user?.email}</p>
-              <p className="text-cyan-300 text-sm">Tap to edit profile</p>
-            </div>
           </div>
         </div>
       </div>

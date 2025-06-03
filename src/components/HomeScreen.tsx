@@ -1,244 +1,179 @@
-
 import React, { useState, useEffect } from 'react';
-import { Shield, Wifi, Battery, Signal, Clock, Zap, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { vpnService, VPNStats } from '@/services/vpnService';
-import { billingService } from '@/services/billingService';
-import { toast } from 'sonner';
+import { vpnService } from '../services/vpnService';
+import { Power, ShieldCheck, BarChart3 } from 'lucide-react';
 
 interface HomeScreenProps {
-  onTabChange?: (tab: string) => void;
+  onTabChange: (tab: string) => void;
 }
 
 const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
-  const { user, wallet } = useAuth();
-  const [vpnStats, setVpnStats] = useState<VPNStats>(vpnService.getStats());
-  const [connecting, setConnecting] = useState(false);
+  const { user, profile, wallet } = useAuth();
+  const [vpnStats, setVpnStats] = useState(vpnService.getStats());
+  const [loading, setLoading] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState(vpnService.getCurrentPlan());
 
   useEffect(() => {
-    // Start Pay-As-You-Go billing monitoring
-    billingService.startPayAsYouGoBilling();
-
-    // Listen for low balance notifications
-    const handleLowBalance = () => {
-      toast.warning('Low wallet balance! Please top up to continue using VPN.');
-    };
-    window.addEventListener('low-wallet-balance', handleLowBalance);
-
-    // Update stats every second
     const interval = setInterval(() => {
       setVpnStats(vpnService.getStats());
+      setCurrentPlan(vpnService.getCurrentPlan());
     }, 1000);
 
-    return () => {
-      billingService.stopPayAsYouGoBilling();
-      window.removeEventListener('low-wallet-balance', handleLowBalance);
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, []);
 
   const handleVPNToggle = async () => {
-    if (!wallet || wallet.balance < 20) { // Need at least ₦0.20 for 1MB
-      toast.error('Insufficient wallet balance. Please top up to use VPN.');
-      return;
-    }
-
-    setConnecting(true);
+    setLoading(true);
     try {
       if (vpnStats.isConnected) {
         await vpnService.disconnect();
-        toast.success('VPN Disconnected');
       } else {
         await vpnService.connect();
-        toast.success('VPN Connected Successfully!');
       }
-    } catch (error) {
-      toast.error('Failed to toggle VPN connection');
     } finally {
-      setConnecting(false);
+      setLoading(false);
     }
   };
-
-  const formatBalance = (balance: number) => {
-    return `₦${(balance / 100).toLocaleString()}`;
-  };
-
-  const formatDataUsage = (mb: number) => {
-    if (mb < 1024) {
-      return `${mb.toFixed(1)}MB`;
-    }
-    return `${(mb / 1024).toFixed(2)}GB`;
-  };
-
-  const savingsPercentage = vpnService.getSavingsPercentage();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white pb-24">
-      {/* Header with user info */}
+      {/* Header */}
       <div className="bg-gradient-to-r from-blue-900 to-blue-800 px-6 pt-12 pb-8 rounded-b-3xl shadow-xl">
+        {/* Greeting */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-white text-2xl font-bold">Hello, {user?.email?.split('@')[0] || 'User'}!</h1>
-            <p className="text-blue-200">Welcome to GoodDeeds Data</p>
+            <h1 className="text-white text-2xl font-bold">
+              Hello, {profile?.full_name?.split(' ')[0] || 'User'}! 👋
+            </h1>
+            <p className="text-blue-200">Ready to save on data today?</p>
           </div>
-          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-            <Shield size={24} className="text-white" />
+          <div className="text-right">
+            <div className="text-white text-sm">Wallet Balance</div>
+            <div className="text-white text-xl font-bold">₦{((wallet?.balance || 0) / 100).toFixed(2)}</div>
           </div>
         </div>
 
-        {/* Balance card */}
-        <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-6 border border-white/20">
+        {/* VPN Status Card */}
+        <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-6 border border-white/20 mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div className={`w-4 h-4 rounded-full ${vpnStats.isConnected ? 'bg-green-400' : 'bg-red-400'} animate-pulse`}></div>
+              <div>
+                <h3 className="text-white text-lg font-semibold">
+                  {vpnStats.isConnected ? 'Connected' : 'Disconnected'}
+                </h3>
+                <p className="text-blue-200 text-sm">
+                  {vpnStats.isConnected ? `${vpnStats.location} • ${vpnStats.speed}` : 'Tap to connect and start saving'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleVPNToggle}
+              disabled={loading}
+              className={`px-6 py-3 rounded-2xl font-semibold transition-all duration-300 ${
+                vpnStats.isConnected
+                  ? 'bg-red-500 hover:bg-red-600 text-white'
+                  : 'bg-green-500 hover:bg-green-600 text-white'
+              } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {loading ? 'Connecting...' : (vpnStats.isConnected ? 'Disconnect' : 'Connect')}
+            </button>
+          </div>
+
+          {/* Data Usage Today */}
+          {vpnStats.isConnected && (
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="text-center">
+                <div className="text-white text-lg font-bold">{vpnStats.dataUsed.toFixed(0)}MB</div>
+                <div className="text-blue-200 text-sm">Used Today</div>
+              </div>
+              <div className="text-center">
+                <div className="text-green-300 text-lg font-bold">{vpnStats.dataSaved.toFixed(0)}MB</div>
+                <div className="text-blue-200 text-sm">Saved Today</div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Current Plan Status */}
+        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-200 mb-1">Wallet Balance</p>
-              <h2 className="text-2xl font-bold text-white">
-                {wallet ? formatBalance(wallet.balance) : '₦0.00'}
-              </h2>
+              <div className="text-white font-medium">
+                {currentPlan.type === 'payg' ? 'Pay-As-You-Go Active' :
+                 currentPlan.type === 'data' ? 'Data Plan Active' :
+                 currentPlan.type === 'subscription' ? 'Subscription Active' :
+                 'No Active Plan'}
+              </div>
+              <div className="text-blue-200 text-sm">
+                {currentPlan.type === 'payg' ? `₦${((wallet?.balance || 0) / 100).toFixed(2)} balance` :
+                 currentPlan.type === 'data' ? `${Math.max(0, currentPlan.totalMB - currentPlan.usedMB).toFixed(0)}MB remaining` :
+                 currentPlan.type === 'subscription' ? `${Math.max(0, currentPlan.totalMB - currentPlan.usedMB).toFixed(0)}MB remaining` :
+                 'Choose a plan to start'}
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-blue-200 mb-1">Pay-As-You-Go Rate</p>
-              <p className="text-cyan-300 font-semibold">₦0.20/MB</p>
-            </div>
+            <button 
+              onClick={() => onTabChange('current-plan')}
+              className="px-4 py-2 bg-white/20 rounded-xl text-white text-sm font-medium hover:bg-white/30 transition-all duration-300"
+            >
+              View Plan
+            </button>
           </div>
         </div>
       </div>
 
-      {/* VPN Connection Status */}
+      {/* Daily Bonus */}
       <div className="px-6 mt-6">
-        <div className="bg-white rounded-3xl p-6 shadow-xl border border-blue-100 mb-6">
-          <div className="text-center">
-            <div className={`w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center transition-all duration-500 ${
-              vpnStats.isConnected 
-                ? 'bg-gradient-to-br from-green-400 to-emerald-600 shadow-lg' 
-                : 'bg-gradient-to-br from-gray-400 to-gray-600'
-            }`}>
-              <Shield size={48} className="text-white" />
+        <div className="bg-white rounded-3xl p-6 shadow-xl border border-blue-100">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-blue-900">Daily Bonus</h3>
+              <p className="text-blue-600 text-sm">Claim your daily data bonus!</p>
             </div>
-            
-            <h3 className="text-xl font-bold text-blue-900 mb-2">
-              {vpnStats.isConnected ? 'Connected' : 'Disconnected'}
-            </h3>
-            
-            <p className="text-blue-600 mb-4">
-              {vpnStats.isConnected 
-                ? `Connected since ${vpnStats.connectedSince?.toLocaleTimeString()}`
-                : 'Tap to connect and start saving data'
-              }
-            </p>
-
-            <button
-              onClick={handleVPNToggle}
-              disabled={connecting}
-              className={`w-full py-4 rounded-2xl font-semibold text-lg transition-all duration-300 transform hover:scale-105 ${
-                vpnStats.isConnected
-                  ? 'bg-gradient-to-r from-red-500 to-red-600 text-white hover:shadow-xl'
-                  : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-xl'
-              } disabled:opacity-50 disabled:transform-none`}
-            >
-              {connecting ? 'Connecting...' : (vpnStats.isConnected ? 'Disconnect VPN' : 'Connect VPN')}
-            </button>
+            <div className="text-3xl">🎁</div>
           </div>
+          
+          <button className="w-full py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-blue-900 rounded-xl font-semibold hover:shadow-lg transition-all duration-300">
+            Claim Bonus
+          </button>
         </div>
+      </div>
 
-        {/* Data Usage Stats */}
-        {vpnStats.isConnected && (
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-white rounded-2xl p-4 shadow-lg border border-blue-100">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <TrendingUp size={20} className="text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-blue-600">Data Used</p>
-                  <p className="font-bold text-blue-900">{formatDataUsage(vpnStats.dataUsed)}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-2xl p-4 shadow-lg border border-blue-100">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                  <Zap size={20} className="text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-blue-600">Data Saved</p>
-                  <p className="font-bold text-green-600">{formatDataUsage(vpnStats.dataSaved)}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Savings Percentage */}
-        {vpnStats.dataUsed > 0 && (
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-200 mb-6">
-            <div className="text-center">
-              <div className="text-4xl font-bold text-green-600 mb-2">{savingsPercentage}%</div>
-              <p className="text-green-700 font-semibold">Data Savings Today</p>
-              <p className="text-sm text-green-600 mt-2">
-                You've saved {formatDataUsage(vpnStats.dataSaved)} compared to normal usage
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Connection Details */}
-        {vpnStats.isConnected && (
-          <div className="bg-white rounded-3xl p-6 shadow-xl border border-blue-100 mb-6">
-            <h3 className="text-lg font-bold text-blue-900 mb-4">Connection Details</h3>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center space-x-3">
-                <Signal size={20} className="text-blue-600" />
-                <div>
-                  <p className="text-sm text-blue-600">Download</p>
-                  <p className="font-semibold text-blue-900">{vpnStats.downloadSpeed.toFixed(1)} Mbps</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-3">
-                <TrendingUp size={20} className="text-blue-600" />
-                <div>
-                  <p className="text-sm text-blue-600">Upload</p>
-                  <p className="font-semibold text-blue-900">{vpnStats.uploadSpeed.toFixed(1)} Mbps</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-3">
-                <Wifi size={20} className="text-blue-600" />
-                <div>
-                  <p className="text-sm text-blue-600">Server</p>
-                  <p className="font-semibold text-blue-900">Nigeria</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-3">
-                <Clock size={20} className="text-blue-600" />
-                <div>
-                  <p className="text-sm text-blue-600">Ping</p>
-                  <p className="font-semibold text-blue-900">45ms</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-4">
+      {/* Quick Actions */}
+      <div className="px-6 mt-6">
+        <h3 className="text-xl font-bold text-blue-900 mb-4">Quick Actions</h3>
+        
+        <div className="grid grid-cols-2 gap-4 mb-6">
           <button 
-            onClick={() => onTabChange && onTabChange('plans')}
-            className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-4 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+            onClick={() => onTabChange('plans')}
+            className="bg-white rounded-2xl p-4 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300"
           >
-            <Zap size={24} className="mx-auto mb-2" />
-            <span className="block font-semibold">Buy Data</span>
+            <div className="text-blue-600 text-3xl mb-2">📊</div>
+            <h4 className="font-semibold text-blue-900">Buy Data</h4>
+            <p className="text-blue-600 text-sm">Plans & subscriptions</p>
           </button>
           
           <button 
-            onClick={() => onTabChange && onTabChange('usage')}
-            className="bg-gradient-to-r from-purple-500 to-pink-600 text-white p-4 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+            onClick={() => onTabChange('usage')}
+            className="bg-white rounded-2xl p-4 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300"
           >
-            <TrendingUp size={24} className="mx-auto mb-2" />
-            <span className="block font-semibold">View Usage</span>
+            <div className="text-green-600 text-3xl mb-2">📈</div>
+            <h4 className="font-semibold text-blue-900">View Usage</h4>
+            <p className="text-blue-600 text-sm">Track your savings</p>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <button className="bg-white rounded-2xl p-4 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300">
+            <div className="text-red-600 text-3xl mb-2">🛡️</div>
+            <h4 className="font-semibold text-blue-900">Refer a Friend</h4>
+            <p className="text-blue-600 text-sm">Earn rewards</p>
+          </button>
+          
+          <button className="bg-white rounded-2xl p-4 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300">
+            <div className="text-purple-600 text-3xl mb-2">⚙️</div>
+            <h4 className="font-semibold text-blue-900">Settings</h4>
+            <p className="text-blue-600 text-sm">App preferences</p>
           </button>
         </div>
       </div>
