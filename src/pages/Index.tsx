@@ -61,7 +61,7 @@ const Index = () => {
   const renderMainContent = () => {
     switch (activeTab) {
       case 'home':
-        return <HomeScreen />;
+        return <HomeScreen onTabChange={setActiveTab} />;
       case 'plans':
         return <PlansScreen />;
       case 'usage':
@@ -75,7 +75,7 @@ const Index = () => {
       case 'support':
         return <SupportScreen />;
       default:
-        return <HomeScreen />;
+        return <HomeScreen onTabChange={setActiveTab} />;
     }
   };
 

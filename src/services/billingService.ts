@@ -1,10 +1,12 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-const PAYG_RATE = 200; // ₦200 per GB (200 kobo per MB)
+const PAYG_RATE = 20; // ₦0.20 per MB (20 kobo per MB)
 
 class BillingService {
   private isListening = false;
+  private lastChargeTime = 0;
+  private chargeDebounceMs = 5000; // 5 second debounce to prevent multiple charges
 
   startPayAsYouGoBilling() {
     if (this.isListening) return;
@@ -20,6 +22,14 @@ class BillingService {
 
   private async handleDataUsage(event: CustomEvent) {
     const { dataMB } = event.detail;
+    const now = Date.now();
+    
+    // Prevent multiple charges within debounce period
+    if (now - this.lastChargeTime < this.chargeDebounceMs) {
+      return;
+    }
+    
+    this.lastChargeTime = now;
     const cost = Math.round(dataMB * PAYG_RATE); // Cost in kobo
     
     try {
@@ -57,7 +67,7 @@ class BillingService {
               user_id: user.id,
               type: 'usage',
               amount: -cost,
-              description: `Data usage: ${dataMB.toFixed(2)}MB`,
+              description: `Pay-As-You-Go: ${dataMB.toFixed(2)}MB data usage`,
               status: 'completed'
             });
 

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Shield, Clock, Zap, CheckCircle, Star, Wallet, ArrowLeft } from 'lucide-react';
 import { PAYG_RATE } from '../services/billingService';
@@ -226,7 +227,7 @@ const PlansScreen = () => {
 
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 mb-6">
               <div className="text-center">
-                <div className="text-4xl font-bold text-green-600 mb-2">₦{(PAYG_RATE / 100).toFixed(2)}</div>
+                <div className="text-4xl font-bold text-green-600 mb-2">₦0.20</div>
                 <div className="text-lg text-green-700 font-semibold">per MB</div>
                 <div className="text-sm text-green-600 mt-2">₦200 per GB • No commitments</div>
               </div>

@@ -86,7 +86,10 @@ const SettingsScreen = () => {
         </div>
 
         {/* Profile Preview */}
-        <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-6 border border-white/20">
+        <div 
+          onClick={() => setShowProfile(true)}
+          className="bg-white/10 backdrop-blur-sm rounded-3xl p-6 border border-white/20 cursor-pointer hover:bg-white/20 transition-all duration-300"
+        >
           <div className="flex items-center space-x-4">
             <div className="w-16 h-16 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-2xl flex items-center justify-center">
               <User size={32} className="text-white" />
@@ -94,7 +97,7 @@ const SettingsScreen = () => {
             <div>
               <h3 className="text-white text-xl font-bold">{profile?.full_name || 'User'}</h3>
               <p className="text-blue-200">{user?.email}</p>
-              <p className="text-cyan-300 text-sm">Premium Member</p>
+              <p className="text-cyan-300 text-sm">Tap to edit profile</p>
             </div>
           </div>
         </div>

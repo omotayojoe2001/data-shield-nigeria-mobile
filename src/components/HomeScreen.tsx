@@ -6,7 +6,11 @@ import { vpnService, VPNStats } from '@/services/vpnService';
 import { billingService } from '@/services/billingService';
 import { toast } from 'sonner';
 
-const HomeScreen = () => {
+interface HomeScreenProps {
+  onTabChange?: (tab: string) => void;
+}
+
+const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   const { user, wallet } = useAuth();
   const [vpnStats, setVpnStats] = useState<VPNStats>(vpnService.getStats());
   const [connecting, setConnecting] = useState(false);
@@ -221,12 +225,18 @@ const HomeScreen = () => {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4">
-          <button className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-4 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+          <button 
+            onClick={() => onTabChange && onTabChange('plans')}
+            className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-4 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+          >
             <Zap size={24} className="mx-auto mb-2" />
             <span className="block font-semibold">Buy Data</span>
           </button>
           
-          <button className="bg-gradient-to-r from-purple-500 to-pink-600 text-white p-4 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+          <button 
+            onClick={() => onTabChange && onTabChange('usage')}
+            className="bg-gradient-to-r from-purple-500 to-pink-600 text-white p-4 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+          >
             <TrendingUp size={24} className="mx-auto mb-2" />
             <span className="block font-semibold">View Usage</span>
           </button>

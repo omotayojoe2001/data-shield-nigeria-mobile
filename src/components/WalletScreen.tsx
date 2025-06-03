@@ -11,12 +11,15 @@ const WalletScreen = () => {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [bonusLoading, setBonusLoading] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [monthlyStats, setMonthlyStats] = useState({ spent: 0, saved: 0 });
   
   const topUpAmounts = [500, 1000, 2000, 5000, 10000];
 
   useEffect(() => {
     if (user) {
       fetchTransactions();
+      calculateMonthlyStats();
     }
   }, [user]);
 
@@ -29,13 +32,41 @@ const WalletScreen = () => {
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (error) throw error;
       setTransactions(data || []);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast.error('Failed to load transactions');
+    }
+  };
+
+  const calculateMonthlyStats = async () => {
+    if (!user) return;
+    
+    try {
+      const currentMonth = new Date();
+      const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+      
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('amount, type')
+        .eq('user_id', user.id)
+        .gte('created_at', firstDay.toISOString());
+
+      if (!error && data) {
+        const spent = data
+          .filter(t => t.amount < 0)
+          .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        
+        // Calculate estimated savings (assume 70% compression)
+        const saved = Math.round(spent * 0.7);
+        
+        setMonthlyStats({ spent, saved });
+      }
+    } catch (error) {
+      console.error('Error calculating monthly stats:', error);
     }
   };
 
@@ -89,8 +120,95 @@ const WalletScreen = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-NG');
+    return new Date(dateString).toLocaleDateString('en-NG', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
+
+  const getTransactionIcon = (type: string) => {
+    switch (type) {
+      case 'topup':
+        return <ArrowDownLeft size={16} className="text-green-600" />;
+      case 'bonus':
+        return <Gift size={16} className="text-purple-600" />;
+      case 'usage':
+        return <ArrowUpRight size={16} className="text-red-600" />;
+      default:
+        return <ArrowUpRight size={16} className="text-blue-600" />;
+    }
+  };
+
+  const getTransactionColor = (type: string) => {
+    switch (type) {
+      case 'topup':
+        return 'bg-green-100';
+      case 'bonus':
+        return 'bg-purple-100';
+      case 'usage':
+        return 'bg-red-100';
+      default:
+        return 'bg-blue-100';
+    }
+  };
+
+  if (showHistory) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white pb-24">
+        <div className="bg-gradient-to-r from-blue-900 to-blue-800 px-6 pt-12 pb-8 rounded-b-3xl shadow-xl">
+          <div className="flex items-center space-x-4 mb-6">
+            <button 
+              onClick={() => setShowHistory(false)}
+              className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center"
+            >
+              <ArrowDownLeft size={20} className="text-white" />
+            </button>
+            <div>
+              <h1 className="text-white text-2xl font-bold">Transaction History</h1>
+              <p className="text-blue-200">All your transactions</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 mt-6">
+          <div className="space-y-3">
+            {transactions.length > 0 ? (
+              transactions.map((transaction) => (
+                <div key={transaction.id} className="bg-white rounded-2xl p-4 shadow-lg border border-blue-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${getTransactionColor(transaction.type)}`}>
+                        {getTransactionIcon(transaction.type)}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-blue-900">{transaction.description}</h4>
+                        <p className="text-sm text-blue-600">{formatDate(transaction.created_at)}</p>
+                      </div>
+                    </div>
+                    <div className={`font-bold ${
+                      transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {transaction.amount > 0 ? '+' : ''}{formatAmount(Math.abs(transaction.amount))}
+                    </div>
+                  </div>
+                  <div className="text-xs text-blue-500 uppercase tracking-wide">
+                    {transaction.type === 'usage' ? 'Data Usage' : 
+                     transaction.type === 'topup' ? 'Wallet Top-up' :
+                     transaction.type === 'bonus' ? 'Daily Bonus' : 'Transaction'}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-center text-blue-600 py-8">No transactions yet</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white pb-24">
@@ -116,11 +234,11 @@ const WalletScreen = () => {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-blue-200">This Month</p>
-                <p className="text-white font-semibold">₦0 spent</p>
+                <p className="text-white font-semibold">{formatAmount(monthlyStats.spent)} spent</p>
               </div>
               <div>
                 <p className="text-blue-200">Saved</p>
-                <p className="text-green-300 font-semibold">₦0</p>
+                <p className="text-green-300 font-semibold">{formatAmount(monthlyStats.saved)}</p>
               </div>
             </div>
           </div>
@@ -137,7 +255,10 @@ const WalletScreen = () => {
             <Plus size={20} />
             <span className="font-semibold">Top Up</span>
           </button>
-          <button className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-4 rounded-2xl shadow-lg flex items-center justify-center space-x-2 hover:shadow-xl transition-all duration-300">
+          <button 
+            onClick={() => setShowHistory(true)}
+            className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-4 rounded-2xl shadow-lg flex items-center justify-center space-x-2 hover:shadow-xl transition-all duration-300"
+          >
             <History size={20} />
             <span className="font-semibold">History</span>
           </button>
@@ -195,26 +316,28 @@ const WalletScreen = () => {
           </div>
         </div>
 
-        {/* Transaction History */}
+        {/* Recent Transactions */}
         <div className="bg-white rounded-3xl p-6 shadow-xl border border-blue-100">
-          <h3 className="text-xl font-bold text-blue-900 mb-4 flex items-center">
-            <History size={20} className="mr-2" />
-            Recent Transactions
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-blue-900 flex items-center">
+              <History size={20} className="mr-2" />
+              Recent Transactions
+            </h3>
+            <button 
+              onClick={() => setShowHistory(true)}
+              className="text-blue-600 hover:text-blue-800 font-semibold"
+            >
+              View All
+            </button>
+          </div>
           
           <div className="space-y-3">
-            {transactions.length > 0 ? (
-              transactions.map((transaction) => (
+            {transactions.slice(0, 5).length > 0 ? (
+              transactions.slice(0, 5).map((transaction) => (
                 <div key={transaction.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-xl">
                   <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      transaction.type === 'topup' ? 'bg-green-100 text-green-600' :
-                      transaction.type === 'bonus' ? 'bg-purple-100 text-purple-600' :
-                      'bg-red-100 text-red-600'
-                    }`}>
-                      {transaction.type === 'topup' ? <ArrowDownLeft size={16} /> :
-                       transaction.type === 'bonus' ? <Gift size={16} /> :
-                       <ArrowUpRight size={16} />}
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${getTransactionColor(transaction.type)}`}>
+                      {getTransactionIcon(transaction.type)}
                     </div>
                     <div>
                       <p className="font-semibold text-blue-900">{transaction.description}</p>
