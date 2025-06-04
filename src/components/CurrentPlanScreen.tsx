@@ -7,12 +7,14 @@ import { planService, type UserPlan } from '../services/planService';
 
 interface CurrentPlanScreenProps {
   onBack: () => void;
+  onTabChange: (tab: string) => void;
 }
 
-const CurrentPlanScreen = ({ onBack }: CurrentPlanScreenProps) => {
+const CurrentPlanScreen = ({ onBack, onTabChange }: CurrentPlanScreenProps) => {
   const { wallet } = useAuth();
   const [vpnStats, setVpnStats] = useState(vpnService.getStats());
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -27,16 +29,22 @@ const CurrentPlanScreen = ({ onBack }: CurrentPlanScreenProps) => {
   }, []);
 
   const loadCurrentPlan = async () => {
-    const plan = await planService.getCurrentPlan();
-    setCurrentPlan(plan);
+    try {
+      const plan = await planService.getCurrentPlan();
+      setCurrentPlan(plan);
+    } catch (error) {
+      console.error('Error loading plan:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getPlanStatusColor = () => {
-    if (!currentPlan) return 'from-gray-500 to-gray-600';
+    if (!currentPlan) return 'from-purple-500 to-purple-600';
     if (currentPlan.plan_type === 'payg') return 'from-green-500 to-green-600';
     if (currentPlan.plan_type === 'data') return 'from-blue-500 to-blue-600';
     if (currentPlan.plan_type === 'free') return 'from-purple-500 to-purple-600';
-    return 'from-gray-500 to-gray-600';
+    return 'from-purple-500 to-purple-600';
   };
 
   const formatDataAmount = (mb: number) => {
@@ -53,21 +61,47 @@ const CurrentPlanScreen = ({ onBack }: CurrentPlanScreenProps) => {
   };
 
   const getPlanDisplayInfo = () => {
-    if (!currentPlan) return { name: 'No Active Plan', remaining: '0MB' };
+    if (!currentPlan) {
+      // Default to free plan if no plan found
+      return { name: 'Free Plan', remaining: '100MB', details: 'Daily allowance' };
+    }
     
     switch (currentPlan.plan_type) {
       case 'free':
         const freeRemaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
-        return { name: 'Free Plan', remaining: formatDataAmount(freeRemaining) };
+        return { 
+          name: 'Free Plan', 
+          remaining: formatDataAmount(freeRemaining), 
+          details: 'Daily allowance'
+        };
       case 'payg':
-        return { name: 'Pay-As-You-Go', remaining: `₦${((wallet?.balance || 0) / 100).toFixed(2)}` };
+        return { 
+          name: 'Pay-As-You-Go', 
+          remaining: `₦${((wallet?.balance || 0) / 100).toFixed(2)}`, 
+          details: 'Wallet balance'
+        };
       case 'data':
         const dataRemaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
-        return { name: 'Data Plan', remaining: formatDataAmount(dataRemaining) };
+        return { 
+          name: 'Data Plan', 
+          remaining: formatDataAmount(dataRemaining), 
+          details: 'Remaining data'
+        };
       default:
-        return { name: 'Unknown Plan', remaining: '0MB' };
+        return { name: 'Free Plan', remaining: '100MB', details: 'Daily allowance' };
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-blue-600">Loading plan details...</p>
+        </div>
+      </div>
+    );
+  }
 
   const planInfo = getPlanDisplayInfo();
 
@@ -97,16 +131,12 @@ const CurrentPlanScreen = ({ onBack }: CurrentPlanScreenProps) => {
               </div>
               <div>
                 <h3 className="text-white text-xl font-bold">{planInfo.name}</h3>
-                <p className="text-white/80">
-                  {currentPlan?.status === 'active' ? 'Active' : 'Inactive'}
-                </p>
+                <p className="text-white/80">Active</p>
               </div>
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-white">{planInfo.remaining}</div>
-              <div className="text-white/80 text-sm">
-                {currentPlan?.plan_type === 'payg' ? 'Balance' : 'Remaining'}
-              </div>
+              <div className="text-white/80 text-sm">{planInfo.details}</div>
             </div>
           </div>
 
@@ -128,9 +158,8 @@ const CurrentPlanScreen = ({ onBack }: CurrentPlanScreenProps) => {
         </div>
       </div>
 
-      {/* Plan Details */}
+      {/* Current Usage Stats */}
       <div className="px-6 mt-6 space-y-6">
-        {/* Current Usage Stats */}
         <div className="bg-white rounded-3xl p-6 shadow-xl border border-blue-100">
           <h3 className="text-xl font-bold text-blue-900 mb-4 flex items-center">
             <TrendingUp size={20} className="mr-2" />
@@ -192,29 +221,21 @@ const CurrentPlanScreen = ({ onBack }: CurrentPlanScreenProps) => {
               </>
             )}
 
-            {currentPlan?.plan_type === 'free' && (
+            {(!currentPlan || currentPlan.plan_type === 'free') && (
               <>
                 <div className="flex justify-between items-center p-4 bg-purple-50 rounded-xl">
                   <span className="text-purple-700 font-medium">Daily Allowance</span>
-                  <span className="text-purple-900 font-bold">{formatDataAmount(currentPlan.data_allocated)}</span>
+                  <span className="text-purple-900 font-bold">{formatDataAmount(currentPlan?.data_allocated || 100)}</span>
                 </div>
                 <div className="flex justify-between items-center p-4 bg-green-50 rounded-xl">
                   <span className="text-green-700 font-medium">Remaining Today</span>
-                  <span className="text-green-900 font-bold">{formatDataAmount(Math.max(0, currentPlan.data_allocated - currentPlan.data_used))}</span>
+                  <span className="text-green-900 font-bold">{formatDataAmount(Math.max(0, (currentPlan?.data_allocated || 100) - (currentPlan?.data_used || 0)))}</span>
                 </div>
                 <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
                   <span className="text-gray-700 font-medium">Next Reset</span>
-                  <span className="text-gray-900 font-bold">{currentPlan.daily_reset_at ? new Date(currentPlan.daily_reset_at).toLocaleDateString() : 'Never'}</span>
+                  <span className="text-gray-900 font-bold">{currentPlan?.daily_reset_at ? new Date(currentPlan.daily_reset_at).toLocaleDateString() : 'Tomorrow'}</span>
                 </div>
               </>
-            )}
-
-            {!currentPlan && (
-              <div className="p-4 bg-red-50 rounded-xl">
-                <p className="text-red-700 text-sm">
-                  No active plan. Choose a plan from the Plans tab to start saving on data usage!
-                </p>
-              </div>
             )}
           </div>
         </div>
@@ -228,15 +249,15 @@ const CurrentPlanScreen = ({ onBack }: CurrentPlanScreenProps) => {
           
           <div className="space-y-3">
             <button 
-              onClick={() => onBack()}
+              onClick={() => onTabChange('plans')}
               className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
             >
               View All Plans
             </button>
             
-            {currentPlan?.plan_type === 'payg' && (
+            {(!currentPlan || currentPlan.plan_type === 'payg') && (
               <button 
-                onClick={() => onBack()}
+                onClick={() => onTabChange('wallet')}
                 className="w-full py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
               >
                 Top Up Wallet

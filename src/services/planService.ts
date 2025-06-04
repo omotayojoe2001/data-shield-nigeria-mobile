@@ -39,10 +39,38 @@ class PlanService {
         throw error;
       }
 
+      // If no active plan found, create and return free plan
+      if (!data) {
+        console.log('No active plan found, creating free plan');
+        await this.createFreePlan(user.id);
+        return await this.getCurrentPlan(); // Recursive call to get the newly created plan
+      }
+
       return data as UserPlan;
     } catch (error) {
       console.error('Error fetching current plan:', error);
       return null;
+    }
+  }
+
+  async createFreePlan(userId: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('user_plans')
+        .insert({
+          user_id: userId,
+          plan_type: 'free',
+          status: 'active',
+          data_allocated: 100,
+          data_used: 0,
+          daily_reset_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        });
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error creating free plan:', error);
+      return false;
     }
   }
 
@@ -53,7 +81,7 @@ class PlanService {
 
       const currentPlan = await this.getCurrentPlan();
 
-      // Deactivate current plan
+      // Deactivate current plan if it exists
       if (currentPlan) {
         await supabase
           .from('user_plans')
@@ -75,7 +103,8 @@ class PlanService {
       const newPlan: any = {
         user_id: user.id,
         plan_type: newPlanType,
-        status: 'active'
+        status: 'active',
+        data_used: 0
       };
 
       if (newPlanType === 'free') {
@@ -84,6 +113,8 @@ class PlanService {
       } else if (newPlanType === 'data' && dataAmount) {
         newPlan.data_allocated = dataAmount;
         newPlan.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      } else if (newPlanType === 'payg') {
+        newPlan.data_allocated = 0; // Unlimited for PAYG
       }
 
       const { error } = await supabase

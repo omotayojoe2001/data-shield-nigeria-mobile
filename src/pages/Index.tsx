@@ -104,7 +104,7 @@ const Index = () => {
       case 'profile':
         return <ProfileScreen onTabChange={setActiveTab} />;
       case 'current-plan':
-        return <CurrentPlanScreen onBack={() => setActiveTab('home')} />;
+        return <CurrentPlanScreen onBack={() => setActiveTab('home')} onTabChange={setActiveTab} />;
       case 'referral':
         return <ReferralScreen />;
       case 'settings':

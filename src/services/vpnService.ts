@@ -79,11 +79,11 @@ class VPNService {
   }
 
   private startDataUsageSimulation() {
-    // Simulate data usage every 10 seconds when connected
+    // Simulate data usage every 30 seconds when connected (more realistic)
     this.dataUsageInterval = setInterval(() => {
       if (this.stats.isConnected) {
-        // Simulate random data usage (1-5 MB per interval)
-        const newDataUsed = Math.random() * 4 + 1;
+        // Simulate random data usage (0.5-2 MB per interval)
+        const newDataUsed = Math.random() * 1.5 + 0.5;
         // Calculate data saved based on compression (60-70% savings)
         const savingsRate = 0.6 + Math.random() * 0.1;
         const newDataSaved = newDataUsed * savingsRate;
@@ -91,10 +91,10 @@ class VPNService {
         this.stats.dataUsed += newDataUsed;
         this.stats.dataSaved += newDataSaved;
         
-        // Trigger data usage event for billing
+        // Trigger data usage event for billing and plan deduction
         this.onDataUsage(newDataUsed);
       }
-    }, 10000);
+    }, 30000); // Every 30 seconds
 
     // Simulate speed variations
     this.speedTestInterval = setInterval(() => {

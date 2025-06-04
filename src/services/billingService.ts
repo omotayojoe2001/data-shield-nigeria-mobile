@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { planService } from './planService';
+import { toast } from 'sonner';
 
 const PAYG_RATE = 20; // ₦0.20 per MB (20 kobo per MB)
 
@@ -37,7 +38,12 @@ class BillingService {
       if (!user) return;
 
       const currentPlan = await planService.getCurrentPlan();
-      if (!currentPlan) return;
+      if (!currentPlan) {
+        console.log('No current plan found for data usage billing');
+        return;
+      }
+
+      console.log(`Processing data usage: ${dataMB}MB on ${currentPlan.plan_type} plan`);
 
       if (currentPlan.plan_type === 'payg') {
         await this.chargePayAsYouGo(user.id, dataMB);
@@ -92,8 +98,9 @@ class BillingService {
         console.log(`Charged ₦${(cost / 100).toFixed(2)} for ${dataMB.toFixed(2)}MB data usage`);
       }
     } else {
-      // Insufficient balance - could trigger low balance notification
+      // Insufficient balance - notify user and disconnect VPN
       console.warn('Insufficient wallet balance for data usage');
+      toast.error('Insufficient wallet balance. Please top up to continue using VPN.');
       this.triggerLowBalanceNotification();
     }
   }
@@ -102,7 +109,7 @@ class BillingService {
     const newUsage = plan.data_used + Math.round(dataMB);
     
     // Update plan usage
-    await supabase
+    const { error } = await supabase
       .from('user_plans')
       .update({ 
         data_used: Math.min(newUsage, plan.data_allocated),
@@ -110,9 +117,13 @@ class BillingService {
       })
       .eq('id', plan.id);
 
-    // If plan is exhausted, switch to free plan
+    if (!error) {
+      console.log(`Deducted ${dataMB.toFixed(2)}MB from data plan. Used: ${newUsage}/${plan.data_allocated}MB`);
+    }
+
+    // If plan is exhausted, notify user
     if (newUsage >= plan.data_allocated) {
-      await planService.switchPlan('free');
+      toast.error('Data plan exhausted! Switch to Pay-As-You-Go or buy more data to continue.');
     }
   }
 
@@ -120,7 +131,7 @@ class BillingService {
     const newUsage = plan.data_used + Math.round(dataMB);
     
     // Update plan usage
-    await supabase
+    const { error } = await supabase
       .from('user_plans')
       .update({ 
         data_used: Math.min(newUsage, plan.data_allocated),
@@ -128,10 +139,13 @@ class BillingService {
       })
       .eq('id', plan.id);
 
-    // If daily quota is exhausted, disconnect VPN
+    if (!error) {
+      console.log(`Deducted ${dataMB.toFixed(2)}MB from free plan. Used: ${newUsage}/${plan.data_allocated}MB`);
+    }
+
+    // If daily quota is exhausted, notify user
     if (newUsage >= plan.data_allocated) {
-      console.log('Daily free quota exhausted');
-      // Could trigger a notification or auto-disconnect
+      toast.error('Daily free quota exhausted! Upgrade to Pay-As-You-Go or buy data to continue.');
     }
   }
 
