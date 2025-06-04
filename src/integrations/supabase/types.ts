@@ -9,6 +9,30 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      daily_bonus_claims: {
+        Row: {
+          created_at: string
+          id: string
+          last_claimed_at: string
+          next_claim_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_claimed_at?: string
+          next_claim_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_claimed_at?: string
+          next_claim_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       data_usage: {
         Row: {
           app_name: string
@@ -39,12 +63,40 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_history: {
+        Row: {
+          from_plan: string | null
+          id: string
+          notes: string | null
+          switch_date: string
+          to_plan: string
+          user_id: string | null
+        }
+        Insert: {
+          from_plan?: string | null
+          id?: string
+          notes?: string | null
+          switch_date?: string
+          to_plan: string
+          user_id?: string | null
+        }
+        Update: {
+          from_plan?: string | null
+          id?: string
+          notes?: string | null
+          switch_date?: string
+          to_plan?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
           full_name: string | null
           id: string
           phone: string | null
+          profile_image_url: string | null
           updated_at: string
           user_id: string | null
         }
@@ -53,6 +105,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           phone?: string | null
+          profile_image_url?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -61,6 +114,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           phone?: string | null
+          profile_image_url?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -155,6 +209,45 @@ export type Database = {
           id?: string
           status?: string
           type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_plans: {
+        Row: {
+          created_at: string
+          daily_reset_at: string | null
+          data_allocated: number | null
+          data_used: number | null
+          expires_at: string | null
+          id: string
+          plan_type: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          daily_reset_at?: string | null
+          data_allocated?: number | null
+          data_used?: number | null
+          expires_at?: string | null
+          id?: string
+          plan_type: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          daily_reset_at?: string | null
+          data_allocated?: number | null
+          data_used?: number | null
+          expires_at?: string | null
+          id?: string
+          plan_type?: string
+          status?: string
+          updated_at?: string
           user_id?: string | null
         }
         Relationships: []

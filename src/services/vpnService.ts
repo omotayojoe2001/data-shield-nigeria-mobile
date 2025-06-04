@@ -1,4 +1,3 @@
-
 // Dummy VPN configuration for simulation
 const DUMMY_VPN_CONFIG = {
   serverIP: "123.45.67.89",
@@ -40,13 +39,6 @@ class VPNService {
     speed: '0 Mbps'
   };
 
-  private currentPlan: CurrentPlan = {
-    type: 'none',
-    isActive: false,
-    totalMB: 0,
-    usedMB: 0
-  };
-
   private dataUsageInterval?: NodeJS.Timeout;
   private speedTestInterval?: NodeJS.Timeout;
 
@@ -64,7 +56,7 @@ class VPNService {
     // Start simulating data usage
     this.startDataUsageSimulation();
     
-    console.log("VPN Connected with config:", DUMMY_VPN_CONFIG);
+    console.log("VPN Connected");
     return true;
   }
 
@@ -84,48 +76,6 @@ class VPNService {
 
   getStats(): VPNStats {
     return { ...this.stats };
-  }
-
-  getCurrentPlan(): CurrentPlan {
-    // Check if user has active plans from billing service
-    const billingData = JSON.parse(localStorage.getItem('billing-data') || '{}');
-    
-    if (billingData.payAsYouGoActive) {
-      this.currentPlan = {
-        type: 'payg',
-        isActive: true,
-        totalMB: 0,
-        usedMB: 0
-      };
-    } else if (billingData.activePlans && billingData.activePlans.length > 0) {
-      const activePlan = billingData.activePlans[0];
-      if (activePlan.type === 'data') {
-        this.currentPlan = {
-          type: 'data',
-          isActive: true,
-          totalMB: activePlan.dataMB,
-          usedMB: activePlan.usedMB || 0,
-          expiryDate: activePlan.expiryDate
-        };
-      } else if (activePlan.type === 'subscription') {
-        this.currentPlan = {
-          type: 'subscription',
-          isActive: true,
-          totalMB: activePlan.dataMB,
-          usedMB: activePlan.usedMB || 0,
-          expiryDate: activePlan.expiryDate
-        };
-      }
-    } else {
-      this.currentPlan = {
-        type: 'none',
-        isActive: false,
-        totalMB: 0,
-        usedMB: 0
-      };
-    }
-
-    return { ...this.currentPlan };
   }
 
   private startDataUsageSimulation() {
@@ -175,16 +125,28 @@ class VPNService {
     window.dispatchEvent(event);
   }
 
-  // Get today's app-wise usage (dummy data)
+  // Get today's app-wise usage (dummy data with randomized values)
   getAppUsage() {
-    return [
-      { name: 'WhatsApp', used: '45MB', saved: '28MB', icon: '💬', color: 'bg-green-500' },
-      { name: 'Instagram', used: '89MB', saved: '62MB', icon: '📷', color: 'bg-pink-500' },
-      { name: 'YouTube', used: '156MB', saved: '94MB', icon: '📺', color: 'bg-red-500' },
-      { name: 'Chrome', used: '67MB', saved: '41MB', icon: '🌐', color: 'bg-blue-500' },
-      { name: 'TikTok', used: '123MB', saved: '78MB', icon: '🎵', color: 'bg-black' },
-      { name: 'Facebook', used: '34MB', saved: '21MB', icon: '👥', color: 'bg-blue-600' }
+    const baseApps = [
+      { name: 'WhatsApp', icon: '💬', color: 'bg-green-500' },
+      { name: 'Instagram', icon: '📷', color: 'bg-pink-500' },
+      { name: 'YouTube', icon: '📺', color: 'bg-red-500' },
+      { name: 'Chrome', icon: '🌐', color: 'bg-blue-500' },
+      { name: 'TikTok', icon: '🎵', color: 'bg-black' },
+      { name: 'Facebook', icon: '👥', color: 'bg-blue-600' }
     ];
+
+    return baseApps.map(app => {
+      const used = Math.floor(Math.random() * 150 + 20); // 20-170 MB
+      const savingsRate = 0.45 + Math.random() * 0.4; // 45-85% savings
+      const saved = Math.floor(used * savingsRate);
+      
+      return {
+        ...app,
+        used: `${used}MB`,
+        saved: `${saved}MB`
+      };
+    });
   }
 
   resetDailyStats() {
@@ -192,9 +154,12 @@ class VPNService {
     this.stats.dataSaved = 0;
   }
 
-  // Calculate savings percentage correctly
+  // Calculate savings percentage with randomized realistic values
   getSavingsPercentage(): number {
-    if (this.stats.dataUsed === 0) return 0;
+    if (this.stats.dataUsed === 0) {
+      // Return a randomized savings percentage when no real data
+      return Math.floor(Math.random() * 40 + 45); // 45-85%
+    }
     return Math.round((this.stats.dataSaved / (this.stats.dataUsed + this.stats.dataSaved)) * 100);
   }
 }
