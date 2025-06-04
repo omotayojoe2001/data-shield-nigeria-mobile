@@ -233,6 +233,75 @@ class PlanService {
       return { success: false, message: 'Failed to claim bonus' };
     }
   }
+
+  async resetDailyFreeData(): Promise<void> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const currentPlan = await this.getCurrentPlan();
+      if (!currentPlan || currentPlan.plan_type !== 'free') return;
+
+      const now = new Date();
+      const resetTime = new Date(currentPlan.daily_reset_at || now);
+
+      if (now >= resetTime) {
+        // Reset data usage and set new reset time
+        await supabase
+          .from('user_plans')
+          .update({
+            data_used: 0,
+            daily_reset_at: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+            updated_at: now.toISOString()
+          })
+          .eq('id', currentPlan.id);
+      }
+    } catch (error) {
+      console.error('Error resetting daily free data:', error);
+    }
+  }
+
+  async updateDataUsage(usageMB: number): Promise<boolean> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      const currentPlan = await this.getCurrentPlan();
+      if (!currentPlan) return false;
+
+      // For free plan, check daily reset first
+      if (currentPlan.plan_type === 'free') {
+        await this.resetDailyFreeData();
+        // Refetch plan after potential reset
+        const updatedPlan = await this.getCurrentPlan();
+        if (updatedPlan) {
+          const newUsage = updatedPlan.data_used + usageMB;
+          await supabase
+            .from('user_plans')
+            .update({
+              data_used: Math.min(newUsage, updatedPlan.data_allocated),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', updatedPlan.id);
+        }
+      } else {
+        // For data and payg plans
+        const newUsage = currentPlan.data_used + usageMB;
+        await supabase
+          .from('user_plans')
+          .update({
+            data_used: currentPlan.plan_type === 'data' ? Math.min(newUsage, currentPlan.data_allocated) : newUsage,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentPlan.id);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error updating data usage:', error);
+      return false;
+    }
+  }
 }
 
 export const planService = new PlanService();

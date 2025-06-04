@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { User, Camera, Lock, Phone, Mail, Save, Eye, EyeOff, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,7 +5,11 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-const ProfileScreen = () => {
+interface ProfileScreenProps {
+  onTabChange?: (tab: string) => void;
+}
+
+const ProfileScreen = ({ onTabChange }: ProfileScreenProps) => {
   const { user, profile, updateProfile, signOut } = useAuth();
   const { theme } = useTheme();
   const [loading, setLoading] = useState(false);
@@ -104,23 +107,26 @@ const ProfileScreen = () => {
       const fileName = `${user.id}/profile.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('profile-images')
+        .from('usersprofilephoto')
         .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('profile-images')
+        .from('usersprofilephoto')
         .getPublicUrl(fileName);
 
       // Update profile with new image URL
-      const { error: updateError } = await updateProfile({
-        profile_image_url: publicUrl
-      });
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ profile_image_url: publicUrl })
+        .eq('user_id', user.id);
 
       if (updateError) throw updateError;
 
       toast.success('Profile photo updated successfully!');
+      // Refresh auth context to get updated profile
+      window.location.reload();
     } catch (error: any) {
       console.error('Upload error:', error);
       toast.error('Failed to upload profile photo');

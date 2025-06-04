@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Wallet, CreditCard, History, Gift, Plus, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/integrations/supabase/client';
+import { planService } from '../services/planService';
 import { toast } from 'sonner';
 
 const WalletScreen = () => {
@@ -15,6 +15,7 @@ const WalletScreen = () => {
   const [bonusLoading, setBonusLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [monthlyStats, setMonthlyStats] = useState({ spent: 0, saved: 0 });
+  const [canClaimBonus, setCanClaimBonus] = useState(false);
   
   const topUpAmounts = [500, 1000, 2000, 5000, 10000];
 
@@ -22,8 +23,22 @@ const WalletScreen = () => {
     if (user) {
       fetchTransactions();
       calculateMonthlyStats();
+      checkBonusStatus();
     }
   }, [user]);
+
+  const checkBonusStatus = async () => {
+    try {
+      const bonusStatus = await planService.getBonusClaimStatus();
+      if (bonusStatus) {
+        const now = new Date();
+        const nextClaimTime = new Date(bonusStatus.next_claim_at);
+        setCanClaimBonus(now >= nextClaimTime);
+      }
+    } catch (error) {
+      console.error('Error checking bonus status:', error);
+    }
+  };
 
   const fetchTransactions = async () => {
     if (!user) return;
@@ -122,45 +137,23 @@ const WalletScreen = () => {
   };
 
   const handleClaimBonus = async () => {
+    if (!canClaimBonus) {
+      toast.error('Bonus not available yet. Please wait for the next claim time.');
+      return;
+    }
+
     setBonusLoading(true);
     try {
-      // Check session before making request
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        toast.error('Please login again to continue');
-        return;
-      }
-
-      const bonusAmount = 5000; // ₦50 in kobo
-      const { data: walletData } = await supabase
-        .from('wallet')
-        .select('balance')
-        .eq('user_id', user.id)
-        .single();
-
-      if (walletData) {
-        await supabase
-          .from('wallet')
-          .update({ 
-            balance: walletData.balance + bonusAmount,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id);
-
-        // Record transaction
-        await supabase
-          .from('transactions')
-          .insert({
-            user_id: user.id,
-            type: 'bonus',
-            amount: bonusAmount,
-            description: 'Daily bonus claimed',
-            status: 'completed'
-          });
-
-        toast.success('Daily bonus claimed successfully!');
+      const result = await planService.claimDailyBonus();
+      if (result.success) {
+        toast.success(result.message);
         await refreshWallet();
         await fetchTransactions();
+        setCanClaimBonus(false);
+        // Check again after 24 hours
+        setTimeout(() => checkBonusStatus(), 24 * 60 * 60 * 1000);
+      } else {
+        toast.error(result.message);
       }
     } catch (error: any) {
       console.error('Bonus claim error:', error);
@@ -171,7 +164,7 @@ const WalletScreen = () => {
   };
 
   const formatAmount = (amount: number) => {
-    return `₦${(amount / 100).toLocaleString()}`;
+    return `₦${(Math.abs(amount) / 100).toLocaleString()}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -191,6 +184,7 @@ const WalletScreen = () => {
       case 'bonus':
         return <Gift size={16} className="text-purple-600" />;
       case 'usage':
+      case 'data_purchase':
         return <ArrowUpRight size={16} className="text-red-600" />;
       default:
         return <ArrowUpRight size={16} className="text-blue-600" />;
@@ -204,6 +198,7 @@ const WalletScreen = () => {
       case 'bonus':
         return theme === 'dark' ? 'bg-purple-900' : 'bg-purple-100';
       case 'usage':
+      case 'data_purchase':
         return theme === 'dark' ? 'bg-red-900' : 'bg-red-100';
       default:
         return theme === 'dark' ? 'bg-blue-900' : 'bg-blue-100';
@@ -246,12 +241,13 @@ const WalletScreen = () => {
                     <div className={`font-bold ${
                       transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {transaction.amount > 0 ? '+' : ''}{formatAmount(Math.abs(transaction.amount))}
+                      {transaction.amount > 0 ? '+' : ''}{formatAmount(transaction.amount)}
                     </div>
                   </div>
                   <div className={`text-xs uppercase tracking-wide ${theme === 'dark' ? 'text-gray-400' : 'text-blue-500'}`}>
                     {transaction.type === 'usage' ? 'Data Usage' : 
                      transaction.type === 'topup' ? 'Wallet Top-up' :
+                     transaction.type === 'data_purchase' ? 'Data Purchase' :
                      transaction.type === 'bonus' ? 'Daily Bonus' : 'Transaction'}
                   </div>
                 </div>
@@ -365,10 +361,10 @@ const WalletScreen = () => {
             </div>
             <button 
               onClick={handleClaimBonus}
-              disabled={bonusLoading}
+              disabled={bonusLoading || !canClaimBonus}
               className="bg-white/20 px-4 py-2 rounded-xl font-semibold hover:bg-white/30 transition-all duration-300 disabled:opacity-50"
             >
-              {bonusLoading ? 'Claiming...' : 'Claim'}
+              {bonusLoading ? 'Claiming...' : (canClaimBonus ? 'Claim' : 'Claimed')}
             </button>
           </div>
         </div>
@@ -404,7 +400,7 @@ const WalletScreen = () => {
                   <div className={`font-bold ${
                     transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {transaction.amount > 0 ? '+' : ''}{formatAmount(Math.abs(transaction.amount))}
+                    {transaction.amount > 0 ? '+' : ''}{formatAmount(transaction.amount)}
                   </div>
                 </div>
               ))

@@ -45,6 +45,9 @@ class BillingService {
 
       console.log(`Processing data usage: ${dataMB}MB on ${currentPlan.plan_type} plan`);
 
+      // Update plan data usage for all plan types
+      await planService.updateDataUsage(dataMB);
+
       if (currentPlan.plan_type === 'payg') {
         await this.chargePayAsYouGo(user.id, dataMB);
       } else if (currentPlan.plan_type === 'data') {
@@ -52,6 +55,18 @@ class BillingService {
       } else if (currentPlan.plan_type === 'free') {
         await this.deductFromFreePlan(currentPlan, dataMB);
       }
+
+      // Record usage transaction for all plans
+      await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          type: 'usage',
+          amount: currentPlan.plan_type === 'payg' ? -(Math.round(dataMB * PAYG_RATE)) : 0,
+          description: `${currentPlan.plan_type.toUpperCase()}: ${dataMB.toFixed(2)}MB data usage`,
+          status: 'completed'
+        });
+
     } catch (error) {
       console.error('Error processing data usage billing:', error);
     }
@@ -84,17 +99,6 @@ class BillingService {
         .eq('user_id', userId);
 
       if (!updateError) {
-        // Record transaction
-        await supabase
-          .from('transactions')
-          .insert({
-            user_id: userId,
-            type: 'usage',
-            amount: -cost,
-            description: `Pay-As-You-Go: ${dataMB.toFixed(2)}MB data usage`,
-            status: 'completed'
-          });
-
         console.log(`Charged ₦${(cost / 100).toFixed(2)} for ${dataMB.toFixed(2)}MB data usage`);
       }
     } else {
@@ -108,18 +112,7 @@ class BillingService {
   private async deductFromDataPlan(plan: any, dataMB: number) {
     const newUsage = plan.data_used + Math.round(dataMB);
     
-    // Update plan usage
-    const { error } = await supabase
-      .from('user_plans')
-      .update({ 
-        data_used: Math.min(newUsage, plan.data_allocated),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', plan.id);
-
-    if (!error) {
-      console.log(`Deducted ${dataMB.toFixed(2)}MB from data plan. Used: ${newUsage}/${plan.data_allocated}MB`);
-    }
+    console.log(`Deducted ${dataMB.toFixed(2)}MB from data plan. Used: ${newUsage}/${plan.data_allocated}MB`);
 
     // If plan is exhausted, notify user
     if (newUsage >= plan.data_allocated) {
@@ -130,18 +123,7 @@ class BillingService {
   private async deductFromFreePlan(plan: any, dataMB: number) {
     const newUsage = plan.data_used + Math.round(dataMB);
     
-    // Update plan usage
-    const { error } = await supabase
-      .from('user_plans')
-      .update({ 
-        data_used: Math.min(newUsage, plan.data_allocated),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', plan.id);
-
-    if (!error) {
-      console.log(`Deducted ${dataMB.toFixed(2)}MB from free plan. Used: ${newUsage}/${plan.data_allocated}MB`);
-    }
+    console.log(`Deducted ${dataMB.toFixed(2)}MB from free plan. Used: ${newUsage}/${plan.data_allocated}MB`);
 
     // If daily quota is exhausted, notify user
     if (newUsage >= plan.data_allocated) {

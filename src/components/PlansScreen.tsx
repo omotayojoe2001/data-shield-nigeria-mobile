@@ -1,15 +1,16 @@
 
 import React, { useState } from 'react';
-import { Shield, Clock, Zap, CheckCircle, Star, Wallet, ArrowLeft } from 'lucide-react';
-import { PAYG_RATE } from '../services/billingService';
+import { Shield, Zap, Wallet, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { planService } from '../services/planService';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 const PlansScreen = () => {
   const [selectedTab, setSelectedTab] = useState<'free' | 'data' | 'payg'>('free');
   const [loading, setLoading] = useState(false);
-  const { user } = useAuth();
+  const [selectedDataPlan, setSelectedDataPlan] = useState<string | null>(null);
+  const { user, wallet, refreshWallet } = useAuth();
 
   const dataPlans = [
     { id: '1gb', size: '1GB', sizeInMB: 1000, price: 20000, displayPrice: '₦200', validity: '30 days' },
@@ -18,7 +19,7 @@ const PlansScreen = () => {
     { id: '10gb', size: '10GB', sizeInMB: 10000, price: 200000, displayPrice: '₦2,000', validity: '30 days' }
   ];
 
-  const handlePlanSwitch = async (planType: 'free' | 'payg' | 'data', dataAmount?: number) => {
+  const handlePlanSwitch = async (planType: 'free' | 'payg') => {
     if (!user) {
       toast.error('Please login to switch plans');
       return;
@@ -26,9 +27,9 @@ const PlansScreen = () => {
 
     setLoading(true);
     try {
-      const success = await planService.switchPlan(planType, dataAmount);
+      const success = await planService.switchPlan(planType);
       if (success) {
-        toast.success(`Successfully switched to ${planType === 'payg' ? 'Pay-As-You-Go' : planType === 'data' ? 'Data Plan' : 'Free Plan'}`);
+        toast.success(`Successfully switched to ${planType === 'payg' ? 'Pay-As-You-Go' : 'Free Plan'}`);
       } else {
         toast.error('Failed to switch plan');
       }
@@ -37,6 +38,94 @@ const PlansScreen = () => {
       toast.error('Failed to switch plan');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDataPlanPurchase = async (plan: typeof dataPlans[0]) => {
+    if (!user || !wallet) {
+      toast.error('Please login to purchase data');
+      return;
+    }
+
+    // Check if user has sufficient balance
+    if (wallet.balance < plan.price) {
+      toast.error(`Insufficient balance. You need ₦${(plan.price / 100).toFixed(2)} but have ₦${(wallet.balance / 100).toFixed(2)}. Please top up your wallet.`);
+      return;
+    }
+
+    setSelectedDataPlan(plan.id);
+    setLoading(true);
+
+    try {
+      // Check session before making request
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        toast.error('Please login again to continue');
+        return;
+      }
+
+      // Deduct from wallet first
+      const { error: walletError } = await supabase
+        .from('wallet')
+        .update({ 
+          balance: wallet.balance - plan.price,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (walletError) throw walletError;
+
+      // Record transaction
+      await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          type: 'data_purchase',
+          amount: -plan.price,
+          description: `Purchased ${plan.size} data plan`,
+          status: 'completed'
+        });
+
+      // Get current data plan to add to existing allocation
+      const currentPlan = await planService.getCurrentPlan();
+      let newDataAllocated = plan.sizeInMB;
+      
+      if (currentPlan && currentPlan.plan_type === 'data') {
+        // Add to existing data allocation
+        newDataAllocated = currentPlan.data_allocated + plan.sizeInMB;
+        
+        // Update existing plan
+        await supabase
+          .from('user_plans')
+          .update({ 
+            data_allocated: newDataAllocated,
+            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentPlan.id);
+      } else {
+        // Switch to data plan or create new one
+        await planService.switchPlan('data', newDataAllocated);
+      }
+
+      // Record plan history
+      await supabase
+        .from('plan_history')
+        .insert({
+          user_id: user.id,
+          to_plan: 'data',
+          notes: `Purchased ${plan.size} data plan`
+        });
+
+      await refreshWallet();
+      toast.success(`Successfully purchased ${plan.size} data plan!`);
+      
+    } catch (error: any) {
+      console.error('Error purchasing data plan:', error);
+      toast.error('Failed to purchase data plan');
+    } finally {
+      setLoading(false);
+      setSelectedDataPlan(null);
     }
   };
 
@@ -156,11 +245,11 @@ const PlansScreen = () => {
                 </div>
                 
                 <button 
-                  onClick={() => handlePlanSwitch('data', plan.sizeInMB)}
-                  disabled={loading}
+                  onClick={() => handleDataPlanPurchase(plan)}
+                  disabled={loading || selectedDataPlan === plan.id}
                   className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50"
                 >
-                  {loading ? 'Processing...' : 'Buy Now'}
+                  {selectedDataPlan === plan.id ? 'Processing...' : 'Buy Now'}
                 </button>
               </div>
             ))}
