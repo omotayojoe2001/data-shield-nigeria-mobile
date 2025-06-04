@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { vpnService } from '../services/vpnService';
 import { planService, type UserPlan, type DailyBonusClaim } from '../services/planService';
 import CountdownTimer from './CountdownTimer';
@@ -13,6 +14,7 @@ interface HomeScreenProps {
 
 const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   const { user, profile, wallet } = useAuth();
+  const { theme } = useTheme();
   const [vpnStats, setVpnStats] = useState(vpnService.getStats());
   const [loading, setLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
@@ -77,28 +79,28 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   };
 
   const getPlanDisplayInfo = () => {
-    if (!currentPlan) return { name: 'No Active Plan', details: 'Choose a plan to start' };
+    if (!currentPlan) return { name: 'Free Plan', details: '100MB daily allowance' };
     
     switch (currentPlan.plan_type) {
       case 'free':
         const remaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
         return { 
-          name: 'Free Plan Active', 
+          name: 'Free Plan', 
           details: `${remaining}MB remaining today` 
         };
       case 'payg':
         return { 
-          name: 'Pay-As-You-Go Active', 
+          name: 'Pay-As-You-Go', 
           details: `₦${((wallet?.balance || 0) / 100).toFixed(2)} balance` 
         };
       case 'data':
         const dataRemaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
         return { 
-          name: 'Data Plan Active', 
+          name: 'Data Plan', 
           details: `${dataRemaining}MB remaining` 
         };
       default:
-        return { name: 'Unknown Plan', details: '' };
+        return { name: 'Free Plan', details: '100MB daily allowance' };
     }
   };
 
@@ -106,16 +108,16 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   const canClaimBonus = bonusStatus && new Date() >= new Date(bonusStatus.next_claim_at);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white pb-24 dark:from-gray-900 dark:to-gray-800">
+    <div className={`min-h-screen pb-24 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-white'}`}>
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-900 to-blue-800 dark:from-gray-800 dark:to-gray-900 px-6 pt-12 pb-8 rounded-b-3xl shadow-xl">
+      <div className={`px-6 pt-12 pb-8 rounded-b-3xl shadow-xl ${theme === 'dark' ? 'bg-gradient-to-r from-gray-800 to-gray-900' : 'bg-gradient-to-r from-blue-900 to-blue-800'}`}>
         {/* Greeting */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-white text-2xl font-bold">
               Hello, {profile?.full_name?.split(' ')[0] || 'User'}! 👋
             </h1>
-            <p className="text-blue-200 dark:text-gray-300">Ready to save on data today?</p>
+            <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>Ready to save on data today?</p>
           </div>
           <div className="text-right">
             <div className="text-white text-sm">Wallet Balance</div>
@@ -132,7 +134,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
                 <h3 className="text-white text-lg font-semibold">
                   {vpnStats.isConnected ? 'Connected' : 'Disconnected'}
                 </h3>
-                <p className="text-blue-200 dark:text-gray-300 text-sm">
+                <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>
                   {vpnStats.isConnected ? `${vpnStats.location} • ${vpnStats.speed}` : 'Tap to connect and start saving'}
                 </p>
               </div>
@@ -155,11 +157,11 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
             <div className="grid grid-cols-2 gap-4 mt-4">
               <div className="text-center">
                 <div className="text-white text-lg font-bold">{vpnStats.dataUsed.toFixed(0)}MB</div>
-                <div className="text-blue-200 dark:text-gray-300 text-sm">Used Today</div>
+                <div className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>Used Today</div>
               </div>
               <div className="text-center">
                 <div className="text-green-300 text-lg font-bold">{vpnStats.dataSaved.toFixed(0)}MB</div>
-                <div className="text-blue-200 dark:text-gray-300 text-sm">Saved Today</div>
+                <div className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>Saved Today</div>
               </div>
             </div>
           )}
@@ -170,7 +172,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-white font-medium">{planInfo.name}</div>
-              <div className="text-blue-200 dark:text-gray-300 text-sm">{planInfo.details}</div>
+              <div className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>{planInfo.details}</div>
             </div>
             <button 
               onClick={() => onTabChange('current-plan')}
@@ -184,11 +186,11 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
 
       {/* Daily Bonus */}
       <div className="px-6 mt-6">
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-xl border border-blue-100 dark:border-gray-700">
+        <div className={`rounded-3xl p-6 shadow-xl border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-lg font-semibold text-blue-900 dark:text-white">Daily Bonus</h3>
-              <p className="text-blue-600 dark:text-gray-300 text-sm">Claim your daily data bonus!</p>
+              <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Daily Bonus</h3>
+              <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>Claim your daily data bonus!</p>
               {bonusStatus && !canClaimBonus && (
                 <CountdownTimer 
                   targetTime={bonusStatus.next_claim_at}
@@ -211,45 +213,45 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
 
       {/* Quick Actions */}
       <div className="px-6 mt-6">
-        <h3 className="text-xl font-bold text-blue-900 dark:text-white mb-4">Quick Actions</h3>
+        <h3 className={`text-xl font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Quick Actions</h3>
         
         <div className="grid grid-cols-2 gap-4 mb-6">
           <button 
             onClick={() => onTabChange('plans')}
-            className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-lg border border-blue-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300"
+            className={`rounded-2xl p-4 shadow-lg border hover:shadow-xl transition-all duration-300 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}
           >
             <div className="text-blue-600 text-3xl mb-2">📊</div>
-            <h4 className="font-semibold text-blue-900 dark:text-white">Buy Data</h4>
-            <p className="text-blue-600 dark:text-gray-300 text-sm">Plans & subscriptions</p>
+            <h4 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Buy Data</h4>
+            <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>Plans & subscriptions</p>
           </button>
           
           <button 
             onClick={() => onTabChange('usage')}
-            className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-lg border border-blue-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300"
+            className={`rounded-2xl p-4 shadow-lg border hover:shadow-xl transition-all duration-300 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}
           >
             <div className="text-green-600 text-3xl mb-2">📈</div>
-            <h4 className="font-semibold text-blue-900 dark:text-white">View Usage</h4>
-            <p className="text-blue-600 dark:text-gray-300 text-sm">Track your savings</p>
+            <h4 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>View Usage</h4>
+            <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>Track your savings</p>
           </button>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <button 
             onClick={() => onTabChange('referral')}
-            className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-lg border border-blue-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300"
+            className={`rounded-2xl p-4 shadow-lg border hover:shadow-xl transition-all duration-300 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}
           >
             <div className="text-red-600 text-3xl mb-2">🛡️</div>
-            <h4 className="font-semibold text-blue-900 dark:text-white">Refer a Friend</h4>
-            <p className="text-blue-600 dark:text-gray-300 text-sm">Earn rewards</p>
+            <h4 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Refer a Friend</h4>
+            <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>Earn rewards</p>
           </button>
           
           <button 
             onClick={() => onTabChange('settings')}
-            className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-lg border border-blue-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300"
+            className={`rounded-2xl p-4 shadow-lg border hover:shadow-xl transition-all duration-300 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}
           >
             <div className="text-purple-600 text-3xl mb-2">⚙️</div>
-            <h4 className="font-semibold text-blue-900 dark:text-white">Settings</h4>
-            <p className="text-blue-600 dark:text-gray-300 text-sm">App preferences</p>
+            <h4 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Settings</h4>
+            <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>App preferences</p>
           </button>
         </div>
       </div>

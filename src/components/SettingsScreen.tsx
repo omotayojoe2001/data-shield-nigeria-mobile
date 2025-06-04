@@ -2,12 +2,17 @@
 import React, { useState } from 'react';
 import { Settings, Lock, Globe, Bell, Palette, HelpCircle, Shield, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
-const SettingsScreen = () => {
-  const [darkMode, setDarkMode] = useState(false);
+interface SettingsScreenProps {
+  onTabChange?: (tab: string) => void;
+}
+
+const SettingsScreen = ({ onTabChange }: SettingsScreenProps) => {
   const [notifications, setNotifications] = useState(true);
   const [language, setLanguage] = useState('English');
   const { signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const handleSignOut = async () => {
     try {
@@ -21,7 +26,12 @@ const SettingsScreen = () => {
     {
       title: 'Security',
       items: [
-        { icon: Lock, label: 'Change Password', subtitle: 'Update your password', action: () => {} },
+        { 
+          icon: Lock, 
+          label: 'Change Password', 
+          subtitle: 'Update your password', 
+          action: () => onTabChange && onTabChange('profile')
+        },
         { icon: Shield, label: 'Privacy & Security', subtitle: 'Manage your privacy', action: () => {} }
       ]
     },
@@ -41,8 +51,8 @@ const SettingsScreen = () => {
           label: 'Dark Mode', 
           subtitle: 'Switch app theme',
           toggle: true,
-          value: darkMode,
-          onChange: setDarkMode
+          value: theme === 'dark',
+          onChange: toggleTheme
         },
         { 
           icon: Globe, 
@@ -65,13 +75,13 @@ const SettingsScreen = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white pb-24">
+    <div className={`min-h-screen pb-24 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-white'}`}>
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-900 to-blue-800 px-6 pt-12 pb-8 rounded-b-3xl shadow-xl">
+      <div className={`px-6 pt-12 pb-8 rounded-b-3xl shadow-xl ${theme === 'dark' ? 'bg-gradient-to-r from-gray-800 to-gray-900' : 'bg-gradient-to-r from-blue-900 to-blue-800'}`}>
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-white text-3xl font-bold">Settings</h1>
-            <p className="text-blue-200">Customize your experience</p>
+            <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>Customize your experience</p>
           </div>
           <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
             <Settings size={24} className="text-white" />
@@ -82,21 +92,21 @@ const SettingsScreen = () => {
       {/* Settings Groups */}
       <div className="px-6 mt-6 space-y-6">
         {settingsGroups.map((group, groupIndex) => (
-          <div key={groupIndex} className="bg-white rounded-3xl shadow-xl border border-blue-100 overflow-hidden">
-            <div className="px-6 py-4 bg-blue-50 border-b border-blue-100">
-              <h3 className="text-lg font-bold text-blue-900">{group.title}</h3>
+          <div key={groupIndex} className={`rounded-3xl shadow-xl border overflow-hidden ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
+            <div className={`px-6 py-4 border-b ${theme === 'dark' ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-100'}`}>
+              <h3 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>{group.title}</h3>
             </div>
             
             <div className="p-2">
               {group.items.map((item, itemIndex) => (
-                <div key={itemIndex} className="flex items-center justify-between p-4 hover:bg-blue-50 rounded-xl transition-all duration-300">
+                <div key={itemIndex} className={`flex items-center justify-between p-4 rounded-xl transition-all duration-300 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-blue-50'}`}>
                   <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                      <item.icon size={20} className="text-blue-600" />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${theme === 'dark' ? 'bg-gray-600' : 'bg-blue-100'}`}>
+                      <item.icon size={20} className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`} />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-blue-900">{item.label}</h4>
-                      <p className="text-sm text-blue-600">{item.subtitle}</p>
+                      <h4 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>{item.label}</h4>
+                      <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>{item.subtitle}</p>
                     </div>
                   </div>
                   
@@ -118,7 +128,7 @@ const SettingsScreen = () => {
                       <select
                         value={item.value}
                         onChange={(e) => item.onChange && item.onChange(e.target.value)}
-                        className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-1 text-blue-900 font-medium"
+                        className={`border rounded-lg px-3 py-1 font-medium ${theme === 'dark' ? 'bg-gray-600 border-gray-500 text-white' : 'bg-blue-50 border-blue-200 text-blue-900'}`}
                       >
                         {item.options?.map((option) => (
                           <option key={option} value={option}>{option}</option>
@@ -129,9 +139,9 @@ const SettingsScreen = () => {
                     {!item.toggle && !item.dropdown && (
                       <button
                         onClick={item.action}
-                        className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center hover:bg-blue-200 transition-all duration-300"
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${theme === 'dark' ? 'bg-gray-600 hover:bg-gray-500' : 'bg-blue-100 hover:bg-blue-200'}`}
                       >
-                        <span className="text-blue-600">›</span>
+                        <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>›</span>
                       </button>
                     )}
                   </div>
@@ -142,36 +152,36 @@ const SettingsScreen = () => {
         ))}
 
         {/* FAQ Section */}
-        <div className="bg-white rounded-3xl p-6 shadow-xl border border-blue-100">
-          <h3 className="text-xl font-bold text-blue-900 mb-4">Frequently Asked Questions</h3>
+        <div className={`rounded-3xl p-6 shadow-xl border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
+          <h3 className={`text-xl font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Frequently Asked Questions</h3>
           
           <div className="space-y-4">
             <details className="group">
-              <summary className="flex items-center justify-between p-3 bg-blue-50 rounded-xl cursor-pointer">
-                <span className="font-semibold text-blue-900">Why is VPN slower sometimes?</span>
-                <span className="text-blue-600 group-open:rotate-180 transition-transform">▼</span>
+              <summary className={`flex items-center justify-between p-3 rounded-xl cursor-pointer ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'}`}>
+                <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Why is VPN slower sometimes?</span>
+                <span className={`group-open:rotate-180 transition-transform ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>▼</span>
               </summary>
-              <div className="p-3 text-blue-700">
+              <div className={`p-3 ${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>
                 VPN can be slower due to encryption and server distance. Our smart compression technology minimizes this impact while maximizing data savings.
               </div>
             </details>
             
             <details className="group">
-              <summary className="flex items-center justify-between p-3 bg-blue-50 rounded-xl cursor-pointer">
-                <span className="font-semibold text-blue-900">Why do I need MTN data?</span>
-                <span className="text-blue-600 group-open:rotate-180 transition-transform">▼</span>
+              <summary className={`flex items-center justify-between p-3 rounded-xl cursor-pointer ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'}`}>
+                <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Why do I need MTN data?</span>
+                <span className={`group-open:rotate-180 transition-transform ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>▼</span>
               </summary>
-              <div className="p-3 text-blue-700">
+              <div className={`p-3 ${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>
                 Our service optimizes your existing data connection. You need an active data plan to connect to our compression servers.
               </div>
             </details>
             
             <details className="group">
-              <summary className="flex items-center justify-between p-3 bg-blue-50 rounded-xl cursor-pointer">
-                <span className="font-semibold text-blue-900">How much data can I save?</span>
-                <span className="text-blue-600 group-open:rotate-180 transition-transform">▼</span>
+              <summary className={`flex items-center justify-between p-3 rounded-xl cursor-pointer ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'}`}>
+                <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>How much data can I save?</span>
+                <span className={`group-open:rotate-180 transition-transform ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>▼</span>
               </summary>
-              <div className="p-3 text-blue-700">
+              <div className={`p-3 ${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>
                 Users typically save 60-70% of their data usage with our smart compression technology, depending on usage patterns.
               </div>
             </details>
@@ -179,7 +189,7 @@ const SettingsScreen = () => {
         </div>
 
         {/* Logout Button */}
-        <div className="bg-white rounded-3xl p-6 shadow-xl border border-red-200">
+        <div className={`rounded-3xl p-6 shadow-xl border ${theme === 'dark' ? 'bg-gray-800 border-red-400' : 'bg-white border-red-200'}`}>
           <button 
             onClick={handleSignOut}
             className="w-full flex items-center justify-center space-x-3 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl font-semibold hover:shadow-lg transition-all duration-300"

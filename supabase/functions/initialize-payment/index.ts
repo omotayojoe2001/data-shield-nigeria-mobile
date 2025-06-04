@@ -13,39 +13,51 @@ serve(async (req) => {
   }
 
   try {
-    const { amount, email, type, planType, duration } = await req.json();
-
-    // Get user from auth header
-    const authHeader = req.headers.get("Authorization")!;
+    // Create Supabase client
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
 
+    // Get user from auth header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("No authorization header");
+    }
+
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     
     if (userError || !user) {
-      throw new Error("Unauthorized");
+      throw new Error("User not authenticated");
     }
 
-    // Initialize Paystack payment with test key
+    const { amount, email, type, callback_url } = await req.json();
+
+    if (!amount || !email) {
+      throw new Error("Amount and email are required");
+    }
+
+    // Initialize Paystack payment
+    const paystackSecretKey = Deno.env.get("PAYSTACK_SECRET_KEY");
+    if (!paystackSecretKey) {
+      throw new Error("Paystack secret key not configured");
+    }
+
     const paystackResponse = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer sk_test_3b4296afe558d06a3166d41b24283bdf5d9afee7`,
+        "Authorization": `Bearer ${paystackSecretKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         email,
-        amount: amount * 100, // Convert to kobo
+        amount,
         currency: "NGN",
-        callback_url: `${req.headers.get("origin")}/payment-success`,
+        callback_url: callback_url || `${req.headers.get("origin")}/`,
         metadata: {
           user_id: user.id,
-          type,
-          plan_type: planType,
-          duration
+          type: type || 'topup'
         }
       }),
     });
@@ -56,19 +68,25 @@ serve(async (req) => {
       throw new Error(paystackData.message || "Payment initialization failed");
     }
 
-    return new Response(JSON.stringify({
-      authorization_url: paystackData.data.authorization_url,
-      access_code: paystackData.data.access_code,
-      reference: paystackData.data.reference
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    return new Response(
+      JSON.stringify({
+        authorization_url: paystackData.data.authorization_url,
+        access_code: paystackData.data.access_code,
+        reference: paystackData.data.reference,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      }
+    );
   } catch (error) {
     console.error("Payment initialization error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      }
+    );
   }
 });

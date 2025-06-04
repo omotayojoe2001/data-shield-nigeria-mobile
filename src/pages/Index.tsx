@@ -14,6 +14,7 @@ import SettingsScreen from '../components/SettingsScreen';
 import SupportScreen from '../components/SupportScreen';
 import CurrentPlanScreen from '../components/CurrentPlanScreen';
 import AppNavigation from '../components/AppNavigation';
+import { toast } from 'sonner';
 
 const Index = () => {
   const [currentScreen, setCurrentScreen] = useState<'splash' | 'onboarding' | 'auth' | 'main'>('splash');
@@ -23,19 +24,30 @@ const Index = () => {
   // Handle Paystack success redirect
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment');
+    const amount = urlParams.get('amount');
     const reference = urlParams.get('reference');
-    const status = urlParams.get('status');
     const trxref = urlParams.get('trxref');
     
-    if ((reference && status === 'success') || trxref) {
-      console.log('Paystack success detected, refreshing wallet and navigating to wallet');
-      // Clear the URL params
+    if (paymentStatus === 'success' || reference || trxref) {
+      console.log('Payment success detected, refreshing wallet');
+      
+      // Clear URL params to prevent repeated processing
       window.history.replaceState({}, document.title, window.location.pathname);
-      // Refresh wallet to show updated balance
-      refreshWallet();
-      // Navigate to wallet tab and ensure main screen is shown
-      setActiveTab('wallet');
-      setCurrentScreen('main');
+      
+      // Show success message
+      if (amount) {
+        toast.success(`Payment successful! ₦${amount} added to your wallet.`);
+      } else {
+        toast.success('Payment successful! Your wallet has been updated.');
+      }
+      
+      // Refresh wallet and navigate to wallet tab
+      setTimeout(() => {
+        refreshWallet();
+        setActiveTab('wallet');
+        setCurrentScreen('main');
+      }, 1000);
     }
   }, [refreshWallet]);
 
@@ -90,13 +102,13 @@ const Index = () => {
       case 'wallet':
         return <WalletScreen />;
       case 'profile':
-        return <ProfileScreen />;
+        return <ProfileScreen onTabChange={setActiveTab} />;
       case 'current-plan':
         return <CurrentPlanScreen onBack={() => setActiveTab('home')} />;
       case 'referral':
         return <ReferralScreen />;
       case 'settings':
-        return <SettingsScreen />;
+        return <SettingsScreen onTabChange={setActiveTab} />;
       case 'support':
         return <SupportScreen />;
       default:

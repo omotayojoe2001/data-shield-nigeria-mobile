@@ -39,7 +39,6 @@ class PlanService {
         throw error;
       }
 
-      // Type assertion to ensure plan_type is properly typed
       return data as UserPlan;
     } catch (error) {
       console.error('Error fetching current plan:', error);
