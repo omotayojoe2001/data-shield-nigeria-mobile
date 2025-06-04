@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Shield, Wallet, Database, Clock, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { vpnService } from '../services/vpnService';
+import { planService, type UserPlan } from '../services/planService';
 
 interface CurrentPlanScreenProps {
   onBack: () => void;
@@ -11,21 +12,30 @@ interface CurrentPlanScreenProps {
 const CurrentPlanScreen = ({ onBack }: CurrentPlanScreenProps) => {
   const { wallet } = useAuth();
   const [vpnStats, setVpnStats] = useState(vpnService.getStats());
-  const [currentPlan, setCurrentPlan] = useState(vpnService.getCurrentPlan());
+  const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setVpnStats(vpnService.getStats());
-      setCurrentPlan(vpnService.getCurrentPlan());
     }, 1000);
 
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    loadCurrentPlan();
+  }, []);
+
+  const loadCurrentPlan = async () => {
+    const plan = await planService.getCurrentPlan();
+    setCurrentPlan(plan);
+  };
+
   const getPlanStatusColor = () => {
-    if (currentPlan.type === 'payg') return 'from-green-500 to-green-600';
-    if (currentPlan.type === 'data') return 'from-blue-500 to-blue-600';
-    if (currentPlan.type === 'subscription') return 'from-purple-500 to-purple-600';
+    if (!currentPlan) return 'from-gray-500 to-gray-600';
+    if (currentPlan.plan_type === 'payg') return 'from-green-500 to-green-600';
+    if (currentPlan.plan_type === 'data') return 'from-blue-500 to-blue-600';
+    if (currentPlan.plan_type === 'free') return 'from-purple-500 to-purple-600';
     return 'from-gray-500 to-gray-600';
   };
 
@@ -35,14 +45,31 @@ const CurrentPlanScreen = ({ onBack }: CurrentPlanScreenProps) => {
   };
 
   const getUsagePercentage = () => {
-    if (currentPlan.type === 'data' && currentPlan.totalMB > 0) {
-      return Math.min((currentPlan.usedMB / currentPlan.totalMB) * 100, 100);
-    }
-    if (currentPlan.type === 'subscription' && currentPlan.totalMB > 0) {
-      return Math.min((currentPlan.usedMB / currentPlan.totalMB) * 100, 100);
+    if (!currentPlan) return 0;
+    if ((currentPlan.plan_type === 'data' || currentPlan.plan_type === 'free') && currentPlan.data_allocated > 0) {
+      return Math.min((currentPlan.data_used / currentPlan.data_allocated) * 100, 100);
     }
     return 0;
   };
+
+  const getPlanDisplayInfo = () => {
+    if (!currentPlan) return { name: 'No Active Plan', remaining: '0MB' };
+    
+    switch (currentPlan.plan_type) {
+      case 'free':
+        const freeRemaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
+        return { name: 'Free Plan', remaining: formatDataAmount(freeRemaining) };
+      case 'payg':
+        return { name: 'Pay-As-You-Go', remaining: `₦${((wallet?.balance || 0) / 100).toFixed(2)}` };
+      case 'data':
+        const dataRemaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
+        return { name: 'Data Plan', remaining: formatDataAmount(dataRemaining) };
+      default:
+        return { name: 'Unknown Plan', remaining: '0MB' };
+    }
+  };
+
+  const planInfo = getPlanDisplayInfo();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white pb-24">
@@ -69,38 +96,26 @@ const CurrentPlanScreen = ({ onBack }: CurrentPlanScreenProps) => {
                 <Shield size={24} className="text-white" />
               </div>
               <div>
-                <h3 className="text-white text-xl font-bold">
-                  {currentPlan.type === 'payg' ? 'Pay-As-You-Go' : 
-                   currentPlan.type === 'data' ? 'Data Plan' : 
-                   currentPlan.type === 'subscription' ? 'Monthly Subscription' : 'No Active Plan'}
-                </h3>
+                <h3 className="text-white text-xl font-bold">{planInfo.name}</h3>
                 <p className="text-white/80">
-                  {currentPlan.isActive ? 'Active' : 'Inactive'}
+                  {currentPlan?.status === 'active' ? 'Active' : 'Inactive'}
                 </p>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-white">
-                {currentPlan.type === 'payg' ? `₦${(wallet?.balance || 0) / 100}` :
-                 currentPlan.type === 'data' ? formatDataAmount(Math.max(0, currentPlan.totalMB - currentPlan.usedMB)) :
-                 currentPlan.type === 'subscription' ? formatDataAmount(Math.max(0, currentPlan.totalMB - currentPlan.usedMB)) :
-                 '₦0'}
-              </div>
+              <div className="text-2xl font-bold text-white">{planInfo.remaining}</div>
               <div className="text-white/80 text-sm">
-                {currentPlan.type === 'payg' ? 'Balance' :
-                 currentPlan.type === 'data' ? 'Remaining' :
-                 currentPlan.type === 'subscription' ? 'Remaining' :
-                 'Balance'}
+                {currentPlan?.plan_type === 'payg' ? 'Balance' : 'Remaining'}
               </div>
             </div>
           </div>
 
-          {/* Usage Progress for Data/Subscription Plans */}
-          {(currentPlan.type === 'data' || currentPlan.type === 'subscription') && currentPlan.totalMB > 0 && (
+          {/* Usage Progress for Data/Free Plans */}
+          {currentPlan && (currentPlan.plan_type === 'data' || currentPlan.plan_type === 'free') && currentPlan.data_allocated > 0 && (
             <div className="mt-4">
               <div className="flex justify-between text-white/80 text-sm mb-2">
-                <span>Used: {formatDataAmount(currentPlan.usedMB)}</span>
-                <span>Total: {formatDataAmount(currentPlan.totalMB)}</span>
+                <span>Used: {formatDataAmount(currentPlan.data_used)}</span>
+                <span>Total: {formatDataAmount(currentPlan.data_allocated)}</span>
               </div>
               <div className="w-full bg-white/20 rounded-full h-3">
                 <div 
@@ -142,7 +157,7 @@ const CurrentPlanScreen = ({ onBack }: CurrentPlanScreenProps) => {
           </h3>
           
           <div className="space-y-4">
-            {currentPlan.type === 'payg' && (
+            {currentPlan?.plan_type === 'payg' && (
               <>
                 <div className="flex justify-between items-center p-4 bg-green-50 rounded-xl">
                   <span className="text-green-700 font-medium">Rate</span>
@@ -160,41 +175,41 @@ const CurrentPlanScreen = ({ onBack }: CurrentPlanScreenProps) => {
               </>
             )}
 
-            {currentPlan.type === 'data' && (
+            {currentPlan?.plan_type === 'data' && (
               <>
                 <div className="flex justify-between items-center p-4 bg-blue-50 rounded-xl">
                   <span className="text-blue-700 font-medium">Plan Size</span>
-                  <span className="text-blue-900 font-bold">{formatDataAmount(currentPlan.totalMB)}</span>
+                  <span className="text-blue-900 font-bold">{formatDataAmount(currentPlan.data_allocated)}</span>
                 </div>
                 <div className="flex justify-between items-center p-4 bg-green-50 rounded-xl">
                   <span className="text-green-700 font-medium">Remaining</span>
-                  <span className="text-green-900 font-bold">{formatDataAmount(Math.max(0, currentPlan.totalMB - currentPlan.usedMB))}</span>
+                  <span className="text-green-900 font-bold">{formatDataAmount(Math.max(0, currentPlan.data_allocated - currentPlan.data_used))}</span>
                 </div>
                 <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
                   <span className="text-gray-700 font-medium">Expires</span>
-                  <span className="text-gray-900 font-bold">{currentPlan.expiryDate || 'Never'}</span>
+                  <span className="text-gray-900 font-bold">{currentPlan.expires_at ? new Date(currentPlan.expires_at).toLocaleDateString() : 'Never'}</span>
                 </div>
               </>
             )}
 
-            {currentPlan.type === 'subscription' && (
+            {currentPlan?.plan_type === 'free' && (
               <>
                 <div className="flex justify-between items-center p-4 bg-purple-50 rounded-xl">
-                  <span className="text-purple-700 font-medium">Monthly Allowance</span>
-                  <span className="text-purple-900 font-bold">{formatDataAmount(currentPlan.totalMB)}</span>
+                  <span className="text-purple-700 font-medium">Daily Allowance</span>
+                  <span className="text-purple-900 font-bold">{formatDataAmount(currentPlan.data_allocated)}</span>
                 </div>
                 <div className="flex justify-between items-center p-4 bg-green-50 rounded-xl">
-                  <span className="text-green-700 font-medium">Remaining This Month</span>
-                  <span className="text-green-900 font-bold">{formatDataAmount(Math.max(0, currentPlan.totalMB - currentPlan.usedMB))}</span>
+                  <span className="text-green-700 font-medium">Remaining Today</span>
+                  <span className="text-green-900 font-bold">{formatDataAmount(Math.max(0, currentPlan.data_allocated - currentPlan.data_used))}</span>
                 </div>
                 <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
-                  <span className="text-gray-700 font-medium">Next Renewal</span>
-                  <span className="text-gray-900 font-bold">{currentPlan.expiryDate || 'Never'}</span>
+                  <span className="text-gray-700 font-medium">Next Reset</span>
+                  <span className="text-gray-900 font-bold">{currentPlan.daily_reset_at ? new Date(currentPlan.daily_reset_at).toLocaleDateString() : 'Never'}</span>
                 </div>
               </>
             )}
 
-            {!currentPlan.isActive && (
+            {!currentPlan && (
               <div className="p-4 bg-red-50 rounded-xl">
                 <p className="text-red-700 text-sm">
                   No active plan. Choose a plan from the Plans tab to start saving on data usage!
@@ -219,7 +234,7 @@ const CurrentPlanScreen = ({ onBack }: CurrentPlanScreenProps) => {
               View All Plans
             </button>
             
-            {currentPlan.type === 'payg' && (
+            {currentPlan?.plan_type === 'payg' && (
               <button 
                 onClick={() => onBack()}
                 className="w-full py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
