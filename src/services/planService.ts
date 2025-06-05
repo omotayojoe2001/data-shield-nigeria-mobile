@@ -74,7 +74,7 @@ class PlanService {
     }
   }
 
-  async switchPlan(newPlanType: 'free' | 'payg' | 'data', options?: { preserveData?: boolean }): Promise<boolean> {
+  async switchPlan(newPlanType: 'free' | 'payg' | 'data', dataMB?: number): Promise<boolean> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
@@ -83,12 +83,10 @@ class PlanService {
       let preservedDataAllocated = 0;
       let preservedDataUsed = 0;
 
-      // If switching to data plan and user has existing data, preserve it
-      if (newPlanType === 'data' && currentPlan && options?.preserveData) {
-        if (currentPlan.plan_type === 'data') {
-          preservedDataAllocated = currentPlan.data_allocated;
-          preservedDataUsed = currentPlan.data_used;
-        }
+      // Preserve existing data when switching to data plan
+      if (newPlanType === 'data' && currentPlan && currentPlan.plan_type === 'data') {
+        preservedDataAllocated = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
+        preservedDataUsed = 0;
       }
 
       // Deactivate current plan if it exists
@@ -114,17 +112,19 @@ class PlanService {
         user_id: user.id,
         plan_type: newPlanType,
         status: 'active',
-        data_allocated: preservedDataAllocated,
-        data_used: preservedDataUsed
+        data_allocated: 0,
+        data_used: 0
       };
 
       if (newPlanType === 'free') {
         newPlan.data_allocated = 100;
-        newPlan.data_used = 0;
         newPlan.daily_reset_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       } else if (newPlanType === 'payg') {
         newPlan.data_allocated = 0; // Unlimited for PAYG
-        newPlan.data_used = 0;
+      } else if (newPlanType === 'data') {
+        newPlan.data_allocated = dataMB || preservedDataAllocated;
+        newPlan.data_used = preservedDataUsed;
+        newPlan.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       }
 
       const { error } = await supabase
@@ -167,34 +167,23 @@ class PlanService {
       if (currentPlan && currentPlan.plan_type === 'data') {
         const remainingData = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
         newDataAllocated = remainingData + dataMB;
-        newDataUsed = 0; // Reset usage when adding new data
-      }
-
-      // Switch to data plan (or update existing one)
-      if (currentPlan) {
-        await supabase
+        newDataUsed = currentPlan.data_used;
+        
+        // Update existing plan instead of creating new one
+        const { error: updateError } = await supabase
           .from('user_plans')
-          .update({ status: 'inactive' })
-          .eq('user_id', user.id)
-          .eq('status', 'active');
+          .update({
+            data_allocated: newDataAllocated,
+            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentPlan.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Switch to data plan
+        await this.switchPlan('data', newDataAllocated);
       }
-
-      // Create new data plan
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + 30); // 30 days
-
-      const { error: planError } = await supabase
-        .from('user_plans')
-        .insert({
-          user_id: user.id,
-          plan_type: 'data',
-          status: 'active',
-          data_allocated: newDataAllocated,
-          data_used: newDataUsed,
-          expires_at: expiryDate.toISOString()
-        });
-
-      if (planError) throw planError;
 
       // Deduct from wallet
       const { error: walletError } = await supabase
@@ -275,19 +264,21 @@ class PlanService {
       const nextClaimTime = new Date(bonusStatus.next_claim_at);
 
       if (now < nextClaimTime) {
-        const timeLeft = Math.ceil((nextClaimTime.getTime() - now.getTime()) / (1000 * 60 * 60));
-        return { success: false, message: `Next bonus available in ${timeLeft}h` };
+        const hoursLeft = Math.ceil((nextClaimTime.getTime() - now.getTime()) / (1000 * 60 * 60));
+        return { success: false, message: `Next bonus available in ${hoursLeft}h` };
       }
 
-      // Update bonus claim record
+      // Update bonus claim record FIRST to prevent double claims
       const nextClaim = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      await supabase
+      const { error: bonusUpdateError } = await supabase
         .from('daily_bonus_claims')
         .update({
           last_claimed_at: now.toISOString(),
           next_claim_at: nextClaim.toISOString()
         })
         .eq('user_id', user.id);
+
+      if (bonusUpdateError) throw bonusUpdateError;
 
       // Add bonus to wallet
       const bonusAmount = 5000; // ₦50 in kobo
@@ -319,6 +310,7 @@ class PlanService {
 
         // Trigger UI updates
         window.dispatchEvent(new CustomEvent('wallet-updated'));
+        window.dispatchEvent(new CustomEvent('plan-updated'));
       }
 
       return { success: true, message: 'Daily bonus claimed successfully!' };
@@ -382,6 +374,9 @@ class PlanService {
               updated_at: new Date().toISOString()
             })
             .eq('id', updatedPlan.id);
+
+          // Trigger UI updates
+          window.dispatchEvent(new CustomEvent('plan-updated'));
         }
       } else {
         // For data and payg plans
@@ -397,6 +392,9 @@ class PlanService {
             updated_at: new Date().toISOString()
           })
           .eq('id', currentPlan.id);
+
+        // Trigger UI updates
+        window.dispatchEvent(new CustomEvent('plan-updated'));
       }
 
       return true;

@@ -78,13 +78,19 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         // Check if user can connect based on their plan
         const plan = await planService.getCurrentPlan();
         if (plan) {
-          if (plan.plan_type === 'free' && plan.data_used >= plan.data_allocated) {
-            toast.error('Daily free data exhausted! Please upgrade your plan.');
-            return;
+          if (plan.plan_type === 'free') {
+            const remainingData = Math.max(0, plan.data_allocated - plan.data_used);
+            if (remainingData <= 0) {
+              toast.error('Daily free data exhausted! Please upgrade your plan.');
+              return;
+            }
           }
-          if (plan.plan_type === 'data' && plan.data_used >= plan.data_allocated) {
-            toast.error('Data plan exhausted! Please buy more data or switch to Pay-As-You-Go.');
-            return;
+          if (plan.plan_type === 'data') {
+            const remainingData = Math.max(0, plan.data_allocated - plan.data_used);
+            if (remainingData <= 0) {
+              toast.error('Data plan exhausted! Please buy more data or switch to Pay-As-You-Go.');
+              return;
+            }
           }
           if (plan.plan_type === 'payg' && (wallet?.balance || 0) < 100) { // Less than ₦1
             toast.error('Insufficient wallet balance! Please top up your wallet.');
@@ -123,9 +129,11 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
     switch (currentPlan.plan_type) {
       case 'free':
         const remaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
+        const resetTime = currentPlan.daily_reset_at ? new Date(currentPlan.daily_reset_at) : new Date();
+        const hoursLeft = Math.max(0, Math.ceil((resetTime.getTime() - new Date().getTime()) / (1000 * 60 * 60)));
         return { 
           name: 'Free Plan', 
-          details: `${remaining}MB remaining today` 
+          details: `${remaining}MB remaining (resets in ${hoursLeft}h)` 
         };
       case 'payg':
         return { 
@@ -134,10 +142,12 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         };
       case 'data':
         const dataRemaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
-        const dataRemainingGB = dataRemaining >= 1000 ? `${(dataRemaining / 1000).toFixed(1)}GB` : `${dataRemaining}MB`;
+        const dataRemainingDisplay = dataRemaining >= 1000 ? `${(dataRemaining / 1000).toFixed(1)}GB` : `${dataRemaining}MB`;
+        const expiryDate = currentPlan.expires_at ? new Date(currentPlan.expires_at) : null;
+        const daysLeft = expiryDate ? Math.max(0, Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
         return { 
           name: 'Data Plan', 
-          details: `${dataRemainingGB} remaining` 
+          details: `${dataRemainingDisplay} remaining (${daysLeft} days left)` 
         };
       default:
         return { name: 'Free Plan', details: '100MB daily allowance' };
@@ -215,10 +225,10 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
               <div className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>{planInfo.details}</div>
             </div>
             <button 
-              onClick={() => onTabChange('current-plan')}
+              onClick={() => onTabChange('plans')}
               className="px-4 py-2 bg-white/20 rounded-xl text-white text-sm font-medium hover:bg-white/30 transition-all duration-300"
             >
-              View Plan
+              View All Plans
             </button>
           </div>
         </div>
@@ -286,7 +296,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
           </button>
           
           <button 
-            onClick={() => onTabChange('settings')}
+            onClick={() => onTabChange('profile')}
             className={`rounded-2xl p-4 shadow-lg border hover:shadow-xl transition-all duration-300 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}
           >
             <div className="text-purple-600 text-3xl mb-2">⚙️</div>

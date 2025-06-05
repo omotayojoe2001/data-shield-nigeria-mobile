@@ -8,7 +8,7 @@ const PAYG_RATE = 20; // ₦0.20 per MB (20 kobo per MB)
 class BillingService {
   private isListening = false;
   private lastChargeTime = 0;
-  private chargeDebounceMs = 3000; // 3 second debounce
+  private chargeDebounceMs = 2000; // 2 second debounce
 
   startPayAsYouGoBilling() {
     if (this.isListening) return;
@@ -47,7 +47,7 @@ class BillingService {
 
       console.log(`Processing ${dataMB.toFixed(2)}MB usage on ${currentPlan.plan_type} plan`);
 
-      // Update plan data usage for all plan types
+      // Update plan data usage for all plan types FIRST
       await planService.updateDataUsage(dataMB);
 
       // Handle billing based on plan type
@@ -59,13 +59,9 @@ class BillingService {
         await this.deductFromFreePlan(currentPlan, dataMB);
       }
 
-      // Record usage transaction for all plans except when insufficient balance
+      // Record usage transaction for all plans
       const cost = currentPlan.plan_type === 'payg' ? Math.round(dataMB * PAYG_RATE) : 0;
-      
-      // Only record transaction if we successfully processed the usage
-      if (currentPlan.plan_type !== 'payg' || cost === 0) {
-        await this.recordUsageTransaction(user.id, currentPlan.plan_type, dataMB, cost);
-      }
+      await this.recordUsageTransaction(user.id, currentPlan.plan_type, dataMB, cost);
 
       // Trigger UI updates
       window.dispatchEvent(new CustomEvent('plan-updated'));
@@ -106,9 +102,6 @@ class BillingService {
       if (!updateError) {
         console.log(`Charged ₦${(cost / 100).toFixed(2)} for ${dataMB.toFixed(2)}MB data usage`);
         
-        // Record successful transaction
-        await this.recordUsageTransaction(userId, 'payg', dataMB, cost);
-        
         // Update auth context
         window.dispatchEvent(new CustomEvent('wallet-updated'));
       }
@@ -116,7 +109,6 @@ class BillingService {
       // Insufficient balance - notify user and stop VPN
       console.warn('Insufficient wallet balance for data usage');
       toast.error('Insufficient wallet balance. Please top up to continue using VPN.');
-      this.triggerLowBalanceNotification();
       
       // Disconnect VPN due to insufficient balance
       window.dispatchEvent(new CustomEvent('vpn-force-disconnect'));
@@ -171,11 +163,6 @@ class BillingService {
     } catch (error) {
       console.error('Error recording usage transaction:', error);
     }
-  }
-
-  private triggerLowBalanceNotification() {
-    const event = new CustomEvent('low-wallet-balance');
-    window.dispatchEvent(event);
   }
 
   calculateDataCost(dataMB: number): number {

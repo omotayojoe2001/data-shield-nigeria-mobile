@@ -3,17 +3,16 @@ import React, { useState, useEffect } from 'react';
 
 interface CountdownTimerProps {
   targetTime: string;
-  onComplete: () => void;
-  prefix?: string;
+  onComplete?: () => void;
 }
 
-const CountdownTimer = ({ targetTime, onComplete, prefix = "Next bonus in" }: CountdownTimerProps) => {
-  const [timeLeft, setTimeLeft] = useState('');
+const CountdownTimer = ({ targetTime, onComplete }: CountdownTimerProps) => {
+  const [timeLeft, setTimeLeft] = useState<string>('');
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date().getTime();
+    const calculateTimeLeft = () => {
       const target = new Date(targetTime).getTime();
+      const now = new Date().getTime();
       const difference = target - now;
 
       if (difference > 0) {
@@ -21,21 +20,24 @@ const CountdownTimer = ({ targetTime, onComplete, prefix = "Next bonus in" }: Co
         const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((difference % (1000 * 60)) / 1000);
         
-        setTimeLeft(`${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`);
+        setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
       } else {
-        setTimeLeft('');
-        onComplete();
+        setTimeLeft('Available now!');
+        if (onComplete) {
+          onComplete();
+        }
       }
-    }, 1000);
+    };
+
+    calculateTimeLeft();
+    const interval = setInterval(calculateTimeLeft, 1000);
 
     return () => clearInterval(interval);
   }, [targetTime, onComplete]);
 
-  if (!timeLeft) return null;
-
   return (
-    <div className="text-blue-200 text-sm">
-      {prefix} {timeLeft}
+    <div className="text-sm font-mono text-yellow-600 bg-yellow-100 px-3 py-1 rounded-full inline-block">
+      Next bonus: {timeLeft}
     </div>
   );
 };

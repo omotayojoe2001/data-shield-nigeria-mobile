@@ -59,10 +59,10 @@ class VPNService {
     this.stats.location = 'Lagos, Nigeria';
     this.stats.speed = '12.5 Mbps';
     
-    // Start simulating data usage
+    // Start simulating data usage immediately
     this.startDataUsageSimulation();
     
-    console.log("VPN Connected");
+    console.log("VPN Connected - starting real-time data usage");
     return true;
   }
 
@@ -76,7 +76,7 @@ class VPNService {
     // Stop simulating data usage
     this.stopDataUsageSimulation();
     
-    console.log("VPN Disconnected");
+    console.log("VPN Disconnected - stopped data usage simulation");
     return true;
   }
 
@@ -92,7 +92,10 @@ class VPNService {
   }
 
   private startDataUsageSimulation() {
-    // Simulate data usage every 15 seconds when connected
+    // Clear any existing intervals
+    this.stopDataUsageSimulation();
+    
+    // Simulate data usage every 5 seconds for faster testing
     this.dataUsageInterval = setInterval(() => {
       if (this.stats.isConnected) {
         // Simulate random data usage (0.5-2 MB per interval)
@@ -106,8 +109,10 @@ class VPNService {
         
         // Trigger data usage event for billing and plan deduction
         this.onDataUsage(newDataUsed);
+        
+        console.log(`VPN Usage: +${newDataUsed.toFixed(2)}MB (Total: ${this.stats.dataUsed.toFixed(2)}MB)`);
       }
-    }, 15000); // Every 15 seconds for faster testing
+    }, 5000); // Every 5 seconds for faster testing
 
     // Simulate speed variations
     this.speedTestInterval = setInterval(() => {
@@ -116,7 +121,7 @@ class VPNService {
         this.stats.uploadSpeed = 6 + Math.random() * 6;
         this.stats.speed = `${this.stats.downloadSpeed.toFixed(1)} Mbps`;
       }
-    }, 5000);
+    }, 3000);
   }
 
   private stopDataUsageSimulation() {
@@ -136,7 +141,7 @@ class VPNService {
       detail: { dataMB, timestamp: new Date() }
     });
     window.dispatchEvent(event);
-    console.log(`Data usage event: ${dataMB.toFixed(2)}MB`);
+    console.log(`Data usage event dispatched: ${dataMB.toFixed(2)}MB`);
   }
 
   // Get today's app-wise usage (dummy data with randomized values)

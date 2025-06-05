@@ -42,7 +42,7 @@ serve(async (req) => {
     const paystackSecretKey = Deno.env.get("PAYSTACK_SECRET_KEY");
     if (!paystackSecretKey) {
       console.error("Paystack secret key not found in environment variables");
-      throw new Error("Payment service temporarily unavailable. Please try again later.");
+      throw new Error("Payment service temporarily unavailable. Please add your Paystack secret key in the settings.");
     }
 
     console.log("Initializing Paystack payment...", { amount, email, type });
@@ -57,7 +57,7 @@ serve(async (req) => {
         email,
         amount,
         currency: "NGN",
-        callback_url: callback_url || `${req.headers.get("origin")}/wallet`,
+        callback_url: callback_url || `${req.headers.get("origin")}/wallet?payment=success`,
         metadata: {
           user_id: user.id,
           type: type || 'topup'

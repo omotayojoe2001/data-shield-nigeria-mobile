@@ -107,29 +107,32 @@ const ProfileScreen = ({ onTabChange }: ProfileScreenProps) => {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/profile.${fileExt}`;
 
-      // Create bucket if it doesn't exist
+      // First, ensure the bucket exists
       const { data: buckets } = await supabase.storage.listBuckets();
-      const bucketExists = buckets?.some(bucket => bucket.name === 'usersprofilephoto');
+      const bucketExists = buckets?.some(bucket => bucket.name === 'profile-images');
       
       if (!bucketExists) {
-        const { error: bucketError } = await supabase.storage.createBucket('usersprofilephoto', {
+        const { error: bucketError } = await supabase.storage.createBucket('profile-images', {
           public: true,
           allowedMimeTypes: ['image/*'],
           fileSizeLimit: 5242880 // 5MB
         });
         if (bucketError) {
           console.error('Bucket creation error:', bucketError);
+          // Continue anyway - bucket might already exist
         }
       }
 
+      // Upload the file
       const { error: uploadError } = await supabase.storage
-        .from('usersprofilephoto')
+        .from('profile-images')
         .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
+      // Get the public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('usersprofilephoto')
+        .from('profile-images')
         .getPublicUrl(fileName);
 
       // Update profile with new image URL
@@ -141,8 +144,12 @@ const ProfileScreen = ({ onTabChange }: ProfileScreenProps) => {
       if (updateError) throw updateError;
 
       toast.success('Profile photo updated successfully!');
-      // Refresh auth context to get updated profile
-      window.location.reload();
+      
+      // Refresh the page to show updated profile
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+      
     } catch (error: any) {
       console.error('Upload error:', error);
       toast.error('Failed to upload profile photo');

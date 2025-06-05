@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Shield, Zap, Wallet, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { planService } from '../services/planService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -11,6 +12,7 @@ const PlansScreen = () => {
   const [loading, setLoading] = useState(false);
   const [selectedDataPlan, setSelectedDataPlan] = useState<string | null>(null);
   const { user, wallet, refreshWallet } = useAuth();
+  const { theme } = useTheme();
 
   const dataPlans = [
     { id: '1gb', size: '1GB', sizeInMB: 1000, price: 20000, displayPrice: '₦200', validity: '30 days' },
@@ -30,6 +32,8 @@ const PlansScreen = () => {
       const success = await planService.switchPlan(planType);
       if (success) {
         toast.success(`Successfully switched to ${planType === 'payg' ? 'Pay-As-You-Go' : 'Free Plan'}`);
+        // Trigger real-time updates
+        window.dispatchEvent(new CustomEvent('plan-updated'));
       } else {
         toast.error('Failed to switch plan');
       }
@@ -64,61 +68,18 @@ const PlansScreen = () => {
         return;
       }
 
-      // Deduct from wallet first
-      const { error: walletError } = await supabase
-        .from('wallet')
-        .update({ 
-          balance: wallet.balance - plan.price,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user.id);
-
-      if (walletError) throw walletError;
-
-      // Record transaction
-      await supabase
-        .from('transactions')
-        .insert({
-          user_id: user.id,
-          type: 'data_purchase',
-          amount: -plan.price,
-          description: `Purchased ${plan.size} data plan`,
-          status: 'completed'
-        });
-
-      // Get current data plan to add to existing allocation
-      const currentPlan = await planService.getCurrentPlan();
-      let newDataAllocated = plan.sizeInMB;
+      // Use the plan service to purchase data plan
+      const result = await planService.purchaseDataPlan(plan.sizeInMB, plan.price);
       
-      if (currentPlan && currentPlan.plan_type === 'data') {
-        // Add to existing data allocation
-        newDataAllocated = currentPlan.data_allocated + plan.sizeInMB;
-        
-        // Update existing plan
-        await supabase
-          .from('user_plans')
-          .update({ 
-            data_allocated: newDataAllocated,
-            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', currentPlan.id);
+      if (result.success) {
+        await refreshWallet();
+        toast.success(result.message);
+        // Trigger real-time updates
+        window.dispatchEvent(new CustomEvent('plan-updated'));
+        window.dispatchEvent(new CustomEvent('wallet-updated'));
       } else {
-        // Switch to data plan or create new one
-        await planService.switchPlan('data', newDataAllocated);
+        toast.error(result.message);
       }
-
-      // Record plan history
-      await supabase
-        .from('plan_history')
-        .insert({
-          user_id: user.id,
-          to_plan: 'data',
-          notes: `Purchased ${plan.size} data plan`
-        });
-
-      await refreshWallet();
-      toast.success(`Successfully purchased ${plan.size} data plan!`);
       
     } catch (error: any) {
       console.error('Error purchasing data plan:', error);
@@ -130,23 +91,23 @@ const PlansScreen = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white pb-24">
+    <div className={`min-h-screen pb-24 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-white'}`}>
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-900 to-blue-800 px-6 pt-12 pb-8 rounded-b-3xl shadow-xl">
+      <div className={`px-6 pt-12 pb-8 rounded-b-3xl shadow-xl ${theme === 'dark' ? 'bg-gradient-to-r from-gray-800 to-gray-900' : 'bg-gradient-to-r from-blue-900 to-blue-800'}`}>
         <h1 className="text-white text-3xl font-bold mb-2">Choose Your Plan</h1>
-        <p className="text-blue-200">Save more data with our smart compression</p>
+        <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>Save more data with our smart compression</p>
       </div>
 
       {/* Tab Selector */}
       <div className="px-6 mt-6">
-        <div className="bg-white rounded-2xl p-2 shadow-lg border border-blue-100">
+        <div className={`rounded-2xl p-2 shadow-lg border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
           <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => setSelectedTab('free')}
               className={`py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
                 selectedTab === 'free'
                   ? 'bg-blue-900 text-white shadow-lg'
-                  : 'text-blue-600 hover:bg-blue-50'
+                  : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-blue-600 hover:bg-blue-50'}`
               }`}
             >
               <Shield size={16} className="inline mr-2" />
@@ -157,7 +118,7 @@ const PlansScreen = () => {
               className={`py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
                 selectedTab === 'data'
                   ? 'bg-blue-900 text-white shadow-lg'
-                  : 'text-blue-600 hover:bg-blue-50'
+                  : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-blue-600 hover:bg-blue-50'}`
               }`}
             >
               <Zap size={16} className="inline mr-2" />
@@ -168,7 +129,7 @@ const PlansScreen = () => {
               className={`py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
                 selectedTab === 'payg'
                   ? 'bg-blue-900 text-white shadow-lg'
-                  : 'text-blue-600 hover:bg-blue-50'
+                  : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-blue-600 hover:bg-blue-50'}`
               }`}
             >
               <Wallet size={16} className="inline mr-2" />
@@ -181,13 +142,13 @@ const PlansScreen = () => {
       {/* Free Plan */}
       {selectedTab === 'free' && (
         <div className="px-6 mt-6">
-          <div className="bg-white rounded-3xl p-6 shadow-xl border border-blue-100">
+          <div className={`rounded-3xl p-6 shadow-xl border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
             <div className="text-center mb-6">
               <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-4">
                 <Shield size={40} className="text-white" />
               </div>
-              <h3 className="text-2xl font-bold text-blue-900 mb-2">Free Plan</h3>
-              <p className="text-blue-600">100MB daily allowance</p>
+              <h3 className={`text-2xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Free Plan</h3>
+              <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>100MB daily allowance</p>
             </div>
 
             <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-2xl p-6 mb-6">
@@ -201,19 +162,19 @@ const PlansScreen = () => {
             <div className="space-y-3 mb-6">
               <div className="flex items-center space-x-3">
                 <CheckCircle size={20} className="text-green-500" />
-                <span className="text-blue-700">100MB daily data allowance</span>
+                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>100MB daily data allowance</span>
               </div>
               <div className="flex items-center space-x-3">
                 <CheckCircle size={20} className="text-green-500" />
-                <span className="text-blue-700">Data compression up to 70%</span>
+                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Data compression up to 70%</span>
               </div>
               <div className="flex items-center space-x-3">
                 <CheckCircle size={20} className="text-green-500" />
-                <span className="text-blue-700">Resets automatically every 24 hours</span>
+                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Resets automatically every 24 hours</span>
               </div>
               <div className="flex items-center space-x-3">
                 <CheckCircle size={20} className="text-green-500" />
-                <span className="text-blue-700">No wallet deductions</span>
+                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>No wallet deductions</span>
               </div>
             </div>
 
@@ -233,14 +194,14 @@ const PlansScreen = () => {
         <div className="px-6 mt-6">
           <div className="space-y-4">
             {dataPlans.map((plan) => (
-              <div key={plan.id} className="bg-white rounded-2xl p-6 shadow-lg border border-blue-100">
+              <div key={plan.id} className={`rounded-2xl p-6 shadow-lg border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-xl font-bold text-blue-900">{plan.size}</h3>
-                    <p className="text-blue-600">Valid for {plan.validity}</p>
+                    <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>{plan.size}</h3>
+                    <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>Valid for {plan.validity}</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-blue-900">{plan.displayPrice}</div>
+                    <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>{plan.displayPrice}</div>
                   </div>
                 </div>
                 
@@ -260,13 +221,13 @@ const PlansScreen = () => {
       {/* Pay-As-You-Go */}
       {selectedTab === 'payg' && (
         <div className="px-6 mt-6">
-          <div className="bg-white rounded-3xl p-6 shadow-xl border border-blue-100">
+          <div className={`rounded-3xl p-6 shadow-xl border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
             <div className="text-center mb-6">
               <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-4">
                 <Wallet size={40} className="text-white" />
               </div>
-              <h3 className="text-2xl font-bold text-blue-900 mb-2">Pay-As-You-Go</h3>
-              <p className="text-blue-600">Only pay for what you use</p>
+              <h3 className={`text-2xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Pay-As-You-Go</h3>
+              <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>Only pay for what you use</p>
             </div>
 
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 mb-6">
@@ -280,19 +241,19 @@ const PlansScreen = () => {
             <div className="space-y-3 mb-6">
               <div className="flex items-center space-x-3">
                 <CheckCircle size={20} className="text-green-500" />
-                <span className="text-blue-700">Only pay for data you actually use</span>
+                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Only pay for data you actually use</span>
               </div>
               <div className="flex items-center space-x-3">
                 <CheckCircle size={20} className="text-green-500" />
-                <span className="text-blue-700">No monthly commitments or contracts</span>
+                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>No monthly commitments or contracts</span>
               </div>
               <div className="flex items-center space-x-3">
                 <CheckCircle size={20} className="text-green-500" />
-                <span className="text-blue-700">Automatic wallet deduction</span>
+                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Automatic wallet deduction</span>
               </div>
               <div className="flex items-center space-x-3">
                 <CheckCircle size={20} className="text-green-500" />
-                <span className="text-blue-700">Up to 70% data savings with compression</span>
+                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Up to 70% data savings with compression</span>
               </div>
             </div>
 
