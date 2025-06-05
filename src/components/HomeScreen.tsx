@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { vpnService } from '../services/vpnService';
 import { planService, type UserPlan, type DailyBonusClaim } from '../services/planService';
+import { billingService } from '../services/billingService';
 import CountdownTimer from './CountdownTimer';
 import { Power, ShieldCheck, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -35,6 +36,25 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
     }
   }, [user]);
 
+  useEffect(() => {
+    // Listen for plan updates
+    const handlePlanUpdate = () => {
+      loadPlanData();
+    };
+
+    const handleWalletUpdate = () => {
+      // Wallet updates are handled by AuthContext
+    };
+
+    window.addEventListener('plan-updated', handlePlanUpdate);
+    window.addEventListener('wallet-updated', handleWalletUpdate);
+
+    return () => {
+      window.removeEventListener('plan-updated', handlePlanUpdate);
+      window.removeEventListener('wallet-updated', handleWalletUpdate);
+    };
+  }, []);
+
   const loadPlanData = async () => {
     try {
       const [plan, bonus] = await Promise.all([
@@ -53,8 +73,27 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
     try {
       if (vpnStats.isConnected) {
         await vpnService.disconnect();
+        billingService.stopPayAsYouGoBilling();
       } else {
+        // Check if user can connect based on their plan
+        const plan = await planService.getCurrentPlan();
+        if (plan) {
+          if (plan.plan_type === 'free' && plan.data_used >= plan.data_allocated) {
+            toast.error('Daily free data exhausted! Please upgrade your plan.');
+            return;
+          }
+          if (plan.plan_type === 'data' && plan.data_used >= plan.data_allocated) {
+            toast.error('Data plan exhausted! Please buy more data or switch to Pay-As-You-Go.');
+            return;
+          }
+          if (plan.plan_type === 'payg' && (wallet?.balance || 0) < 100) { // Less than ₦1
+            toast.error('Insufficient wallet balance! Please top up your wallet.');
+            return;
+          }
+        }
+        
         await vpnService.connect();
+        billingService.startPayAsYouGoBilling();
       }
     } finally {
       setLoading(false);
@@ -91,13 +130,14 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
       case 'payg':
         return { 
           name: 'Pay-As-You-Go', 
-          details: `₦${((wallet?.balance || 0) / 100).toFixed(2)} balance` 
+          details: `₦${((wallet?.balance || 0) / 100).toFixed(2)} balance remaining` 
         };
       case 'data':
         const dataRemaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
+        const dataRemainingGB = dataRemaining >= 1000 ? `${(dataRemaining / 1000).toFixed(1)}GB` : `${dataRemaining}MB`;
         return { 
           name: 'Data Plan', 
-          details: `${dataRemaining}MB remaining` 
+          details: `${dataRemainingGB} remaining` 
         };
       default:
         return { name: 'Free Plan', details: '100MB daily allowance' };
@@ -190,7 +230,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Daily Bonus</h3>
-              <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>Claim your daily data bonus!</p>
+              <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>Claim your daily ₦50 bonus!</p>
               {bonusStatus && !canClaimBonus && (
                 <CountdownTimer 
                   targetTime={bonusStatus.next_claim_at}
@@ -206,7 +246,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
             disabled={!canClaimBonus || bonusLoading}
             className="w-full py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-blue-900 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {bonusLoading ? 'Claiming...' : (canClaimBonus ? 'Claim Bonus' : 'Bonus Claimed')}
+            {bonusLoading ? 'Claiming...' : (canClaimBonus ? 'Claim ₦50 Bonus' : 'Bonus Claimed')}
           </button>
         </div>
       </div>

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { User, Camera, Lock, Phone, Mail, Save, Eye, EyeOff, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -105,6 +106,21 @@ const ProfileScreen = ({ onTabChange }: ProfileScreenProps) => {
 
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/profile.${fileExt}`;
+
+      // Create bucket if it doesn't exist
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const bucketExists = buckets?.some(bucket => bucket.name === 'usersprofilephoto');
+      
+      if (!bucketExists) {
+        const { error: bucketError } = await supabase.storage.createBucket('usersprofilephoto', {
+          public: true,
+          allowedMimeTypes: ['image/*'],
+          fileSizeLimit: 5242880 // 5MB
+        });
+        if (bucketError) {
+          console.error('Bucket creation error:', bucketError);
+        }
+      }
 
       const { error: uploadError } = await supabase.storage
         .from('usersprofilephoto')

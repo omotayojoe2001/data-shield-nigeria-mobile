@@ -43,7 +43,7 @@ class PlanService {
       if (!data) {
         console.log('No active plan found, creating free plan');
         await this.createFreePlan(user.id);
-        return await this.getCurrentPlan(); // Recursive call to get the newly created plan
+        return await this.getCurrentPlan();
       }
 
       return data as UserPlan;
@@ -74,12 +74,22 @@ class PlanService {
     }
   }
 
-  async switchPlan(newPlanType: 'free' | 'payg' | 'data', dataAmount?: number): Promise<boolean> {
+  async switchPlan(newPlanType: 'free' | 'payg' | 'data', options?: { preserveData?: boolean }): Promise<boolean> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
 
       const currentPlan = await this.getCurrentPlan();
+      let preservedDataAllocated = 0;
+      let preservedDataUsed = 0;
+
+      // If switching to data plan and user has existing data, preserve it
+      if (newPlanType === 'data' && currentPlan && options?.preserveData) {
+        if (currentPlan.plan_type === 'data') {
+          preservedDataAllocated = currentPlan.data_allocated;
+          preservedDataUsed = currentPlan.data_used;
+        }
+      }
 
       // Deactivate current plan if it exists
       if (currentPlan) {
@@ -104,17 +114,17 @@ class PlanService {
         user_id: user.id,
         plan_type: newPlanType,
         status: 'active',
-        data_used: 0
+        data_allocated: preservedDataAllocated,
+        data_used: preservedDataUsed
       };
 
       if (newPlanType === 'free') {
         newPlan.data_allocated = 100;
+        newPlan.data_used = 0;
         newPlan.daily_reset_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      } else if (newPlanType === 'data' && dataAmount) {
-        newPlan.data_allocated = dataAmount;
-        newPlan.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       } else if (newPlanType === 'payg') {
         newPlan.data_allocated = 0; // Unlimited for PAYG
+        newPlan.data_used = 0;
       }
 
       const { error } = await supabase
@@ -122,6 +132,10 @@ class PlanService {
         .insert(newPlan);
 
       if (error) throw error;
+
+      // Trigger UI updates
+      window.dispatchEvent(new CustomEvent('plan-updated'));
+      
       return true;
     } catch (error) {
       console.error('Error switching plan:', error);
@@ -129,22 +143,99 @@ class PlanService {
     }
   }
 
-  async getPlanHistory(): Promise<any[]> {
+  async purchaseDataPlan(dataMB: number, cost: number): Promise<{ success: boolean; message: string }> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
+      if (!user) return { success: false, message: 'User not authenticated' };
 
-      const { data, error } = await supabase
-        .from('plan_history')
-        .select('*')
+      // Check wallet balance
+      const { data: wallet } = await supabase
+        .from('wallet')
+        .select('balance')
         .eq('user_id', user.id)
-        .order('switch_date', { ascending: false });
+        .single();
 
-      if (error) throw error;
-      return data || [];
+      if (!wallet || wallet.balance < cost) {
+        return { success: false, message: 'Insufficient wallet balance. Please top up your wallet.' };
+      }
+
+      const currentPlan = await this.getCurrentPlan();
+      let newDataAllocated = dataMB;
+      let newDataUsed = 0;
+
+      // If user is already on data plan, add to existing allocation
+      if (currentPlan && currentPlan.plan_type === 'data') {
+        const remainingData = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
+        newDataAllocated = remainingData + dataMB;
+        newDataUsed = 0; // Reset usage when adding new data
+      }
+
+      // Switch to data plan (or update existing one)
+      if (currentPlan) {
+        await supabase
+          .from('user_plans')
+          .update({ status: 'inactive' })
+          .eq('user_id', user.id)
+          .eq('status', 'active');
+      }
+
+      // Create new data plan
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 30); // 30 days
+
+      const { error: planError } = await supabase
+        .from('user_plans')
+        .insert({
+          user_id: user.id,
+          plan_type: 'data',
+          status: 'active',
+          data_allocated: newDataAllocated,
+          data_used: newDataUsed,
+          expires_at: expiryDate.toISOString()
+        });
+
+      if (planError) throw planError;
+
+      // Deduct from wallet
+      const { error: walletError } = await supabase
+        .from('wallet')
+        .update({ 
+          balance: wallet.balance - cost,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (walletError) throw walletError;
+
+      // Record transaction
+      await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          type: 'data_purchase',
+          amount: -cost,
+          description: `Purchased ${dataMB}MB data plan`,
+          status: 'completed'
+        });
+
+      // Record plan history
+      await supabase
+        .from('plan_history')
+        .insert({
+          user_id: user.id,
+          from_plan: currentPlan?.plan_type || 'none',
+          to_plan: 'data',
+          notes: `Purchased ${dataMB}MB data plan for ₦${(cost / 100).toFixed(2)}`
+        });
+
+      // Trigger UI updates
+      window.dispatchEvent(new CustomEvent('plan-updated'));
+      window.dispatchEvent(new CustomEvent('wallet-updated'));
+
+      return { success: true, message: `Successfully purchased ${dataMB}MB data plan!` };
     } catch (error) {
-      console.error('Error fetching plan history:', error);
-      return [];
+      console.error('Error purchasing data plan:', error);
+      return { success: false, message: 'Failed to purchase data plan' };
     }
   }
 
@@ -225,6 +316,9 @@ class PlanService {
             description: 'Daily bonus claimed',
             status: 'completed'
           });
+
+        // Trigger UI updates
+        window.dispatchEvent(new CustomEvent('wallet-updated'));
       }
 
       return { success: true, message: 'Daily bonus claimed successfully!' };
@@ -255,6 +349,9 @@ class PlanService {
             updated_at: now.toISOString()
           })
           .eq('id', currentPlan.id);
+
+        console.log('Daily free data reset completed');
+        window.dispatchEvent(new CustomEvent('plan-updated'));
       }
     } catch (error) {
       console.error('Error resetting daily free data:', error);
@@ -276,10 +373,12 @@ class PlanService {
         const updatedPlan = await this.getCurrentPlan();
         if (updatedPlan) {
           const newUsage = updatedPlan.data_used + usageMB;
+          const cappedUsage = Math.min(newUsage, updatedPlan.data_allocated);
+          
           await supabase
             .from('user_plans')
             .update({
-              data_used: Math.min(newUsage, updatedPlan.data_allocated),
+              data_used: cappedUsage,
               updated_at: new Date().toISOString()
             })
             .eq('id', updatedPlan.id);
@@ -287,10 +386,14 @@ class PlanService {
       } else {
         // For data and payg plans
         const newUsage = currentPlan.data_used + usageMB;
+        const cappedUsage = currentPlan.plan_type === 'data' 
+          ? Math.min(newUsage, currentPlan.data_allocated) 
+          : newUsage;
+
         await supabase
           .from('user_plans')
           .update({
-            data_used: currentPlan.plan_type === 'data' ? Math.min(newUsage, currentPlan.data_allocated) : newUsage,
+            data_used: cappedUsage,
             updated_at: new Date().toISOString()
           })
           .eq('id', currentPlan.id);
@@ -300,6 +403,25 @@ class PlanService {
     } catch (error) {
       console.error('Error updating data usage:', error);
       return false;
+    }
+  }
+
+  async getPlanHistory(): Promise<any[]> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      const { data, error } = await supabase
+        .from('plan_history')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('switch_date', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching plan history:', error);
+      return [];
     }
   }
 }

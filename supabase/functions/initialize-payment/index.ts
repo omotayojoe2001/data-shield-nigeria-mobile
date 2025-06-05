@@ -41,8 +41,11 @@ serve(async (req) => {
     // Initialize Paystack payment
     const paystackSecretKey = Deno.env.get("PAYSTACK_SECRET_KEY");
     if (!paystackSecretKey) {
-      throw new Error("Paystack secret key not configured");
+      console.error("Paystack secret key not found in environment variables");
+      throw new Error("Payment service temporarily unavailable. Please try again later.");
     }
+
+    console.log("Initializing Paystack payment...", { amount, email, type });
 
     const paystackResponse = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",
@@ -54,7 +57,7 @@ serve(async (req) => {
         email,
         amount,
         currency: "NGN",
-        callback_url: callback_url || `${req.headers.get("origin")}/`,
+        callback_url: callback_url || `${req.headers.get("origin")}/wallet`,
         metadata: {
           user_id: user.id,
           type: type || 'topup'
@@ -63,6 +66,7 @@ serve(async (req) => {
     });
 
     const paystackData = await paystackResponse.json();
+    console.log("Paystack response:", paystackData);
 
     if (!paystackData.status) {
       throw new Error(paystackData.message || "Payment initialization failed");

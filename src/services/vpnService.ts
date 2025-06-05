@@ -1,3 +1,4 @@
+
 // Dummy VPN configuration for simulation
 const DUMMY_VPN_CONFIG = {
   serverIP: "123.45.67.89",
@@ -42,6 +43,11 @@ class VPNService {
   private dataUsageInterval?: NodeJS.Timeout;
   private speedTestInterval?: NodeJS.Timeout;
 
+  constructor() {
+    // Listen for forced disconnections
+    window.addEventListener('vpn-force-disconnect', this.forceDisconnect.bind(this));
+  }
+
   async connect(): Promise<boolean> {
     // Simulate connection delay
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -74,12 +80,19 @@ class VPNService {
     return true;
   }
 
+  private async forceDisconnect(): Promise<void> {
+    if (this.stats.isConnected) {
+      await this.disconnect();
+      console.log("VPN force disconnected due to insufficient balance/quota");
+    }
+  }
+
   getStats(): VPNStats {
     return { ...this.stats };
   }
 
   private startDataUsageSimulation() {
-    // Simulate data usage every 30 seconds when connected (more realistic)
+    // Simulate data usage every 15 seconds when connected
     this.dataUsageInterval = setInterval(() => {
       if (this.stats.isConnected) {
         // Simulate random data usage (0.5-2 MB per interval)
@@ -94,7 +107,7 @@ class VPNService {
         // Trigger data usage event for billing and plan deduction
         this.onDataUsage(newDataUsed);
       }
-    }, 30000); // Every 30 seconds
+    }, 15000); // Every 15 seconds for faster testing
 
     // Simulate speed variations
     this.speedTestInterval = setInterval(() => {
@@ -118,11 +131,12 @@ class VPNService {
   }
 
   private onDataUsage(dataMB: number) {
-    // This will be called to trigger Pay-As-You-Go billing
+    // This will be called to trigger billing and plan deduction
     const event = new CustomEvent('vpn-data-usage', {
       detail: { dataMB, timestamp: new Date() }
     });
     window.dispatchEvent(event);
+    console.log(`Data usage event: ${dataMB.toFixed(2)}MB`);
   }
 
   // Get today's app-wise usage (dummy data with randomized values)
