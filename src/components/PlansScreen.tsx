@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Zap, Wallet, CheckCircle, ArrowRight } from 'lucide-react';
+import { Shield, Zap, Wallet, CheckCircle, ArrowRight, Database } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { planService, type UserPlan } from '../services/planService';
@@ -81,10 +81,19 @@ const PlansScreen = () => {
 
     setLoading(true);
     try {
-      // Switch to data plan with 0 MB initially (will preserve existing data if any)
-      const success = await planService.switchPlan('data', 0);
+      // Check if user has existing unused data from previous data plan
+      const existingDataRemaining = currentPlan?.plan_type === 'data' 
+        ? Math.max(0, currentPlan.data_allocated - currentPlan.data_used)
+        : 0;
+
+      // Switch to data plan, preserving existing data if any
+      const success = await planService.switchPlan('data', existingDataRemaining);
       if (success) {
-        toast.success('Successfully switched to Data Plan');
+        const message = existingDataRemaining > 0 
+          ? `Successfully switched to Data Plan with ${existingDataRemaining}MB preserved`
+          : 'Successfully switched to Data Plan';
+        toast.success(message);
+        
         // Trigger real-time updates
         window.dispatchEvent(new CustomEvent('plan-updated'));
         await loadCurrentPlan();
@@ -247,24 +256,34 @@ const PlansScreen = () => {
       {/* Buy Data Plans */}
       {selectedTab === 'data' && (
         <div className="px-6 mt-6">
-          {/* Switch to Data Plan Button (if not already on data plan) */}
-          {currentPlan?.plan_type !== 'data' && (
+          {/* Current Data Plan Status */}
+          {currentPlan && (
             <div className={`rounded-2xl p-4 shadow-lg border mb-4 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Switch to Data Plan</h3>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
-                    Switch first to preserve existing data
-                  </p>
+                <div className="flex items-center space-x-3">
+                  <Database size={20} className={`${currentPlan.plan_type === 'data' ? 'text-green-600' : 'text-gray-400'}`} />
+                  <div>
+                    <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
+                      {currentPlan.plan_type === 'data' ? 'Data Plan Active' : 'Switch to Data Plan'}
+                    </h3>
+                    <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
+                      {currentPlan.plan_type === 'data' 
+                        ? `${Math.max(0, currentPlan.data_allocated - currentPlan.data_used)}MB remaining`
+                        : 'Preserve your data allocation across plan switches'
+                      }
+                    </p>
+                  </div>
                 </div>
-                <button 
-                  onClick={handleSwitchToDataPlan}
-                  disabled={loading}
-                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50"
-                >
-                  <span>{loading ? 'Switching...' : 'Switch'}</span>
-                  <ArrowRight size={16} />
-                </button>
+                {currentPlan.plan_type !== 'data' && (
+                  <button 
+                    onClick={handleSwitchToDataPlan}
+                    disabled={loading}
+                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50"
+                  >
+                    <span>{loading ? 'Switching...' : 'Switch'}</span>
+                    <ArrowRight size={16} />
+                  </button>
+                )}
               </div>
             </div>
           )}

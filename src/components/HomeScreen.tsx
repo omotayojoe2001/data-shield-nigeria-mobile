@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -63,6 +62,8 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
       ]);
       setCurrentPlan(plan);
       setBonusStatus(bonus);
+      
+      console.log('Loaded bonus status:', bonus);
     } catch (error) {
       console.error('Error loading plan data:', error);
     }
@@ -113,6 +114,8 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
       if (result.success) {
         toast.success(result.message);
         await loadPlanData();
+        // Refresh wallet in auth context
+        window.dispatchEvent(new CustomEvent('wallet-updated'));
       } else {
         toast.error(result.message);
       }
@@ -156,6 +159,13 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
 
   const planInfo = getPlanDisplayInfo();
   const canClaimBonus = bonusStatus && new Date() >= new Date(bonusStatus.next_claim_at);
+
+  console.log('Bonus claim status:', {
+    bonusStatus,
+    canClaimBonus,
+    now: new Date().toISOString(),
+    nextClaim: bonusStatus?.next_claim_at
+  });
 
   return (
     <div className={`min-h-screen pb-24 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-white'}`}>
@@ -242,10 +252,12 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
               <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Daily Bonus</h3>
               <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>Claim your daily ₦50 bonus!</p>
               {bonusStatus && !canClaimBonus && (
-                <CountdownTimer 
-                  targetTime={bonusStatus.next_claim_at}
-                  onComplete={loadPlanData}
-                />
+                <div className="mt-2">
+                  <CountdownTimer 
+                    targetTime={bonusStatus.next_claim_at}
+                    onComplete={loadPlanData}
+                  />
+                </div>
               )}
             </div>
             <div className="text-3xl">🎁</div>

@@ -44,7 +44,7 @@ const Index = () => {
   }
 
   if (!user) {
-    return <AuthScreen onComplete={() => {}} />;
+    return <AuthScreen onComplete={() => setIsFirstTime(false)} />;
   }
 
   if (isFirstTime && profile) {

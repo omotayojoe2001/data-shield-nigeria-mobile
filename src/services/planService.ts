@@ -83,10 +83,19 @@ class PlanService {
       let preservedDataAllocated = 0;
       let preservedDataUsed = 0;
 
-      // Preserve existing data when switching to data plan
-      if (newPlanType === 'data' && currentPlan && currentPlan.plan_type === 'data') {
+      // Preserve existing data when switching to/from data plan
+      if (currentPlan && currentPlan.plan_type === 'data') {
+        // When switching FROM data plan, preserve remaining data for potential return
         preservedDataAllocated = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
         preservedDataUsed = 0;
+        
+        // Store the preserved data in a temporary field or handle it differently
+        console.log(`Preserving ${preservedDataAllocated}MB from previous data plan`);
+      }
+
+      // If switching TO data plan and we have preserved data, use it
+      if (newPlanType === 'data' && preservedDataAllocated > 0) {
+        dataMB = (dataMB || 0) + preservedDataAllocated;
       }
 
       // Deactivate current plan if it exists
@@ -103,7 +112,7 @@ class PlanService {
             user_id: user.id,
             from_plan: currentPlan.plan_type,
             to_plan: newPlanType,
-            notes: `Switched from ${currentPlan.plan_type} to ${newPlanType}`
+            notes: `Switched from ${currentPlan.plan_type} to ${newPlanType}${preservedDataAllocated > 0 ? ` (preserved ${preservedDataAllocated}MB)` : ''}`
           });
       }
 
@@ -122,8 +131,8 @@ class PlanService {
       } else if (newPlanType === 'payg') {
         newPlan.data_allocated = 0; // Unlimited for PAYG
       } else if (newPlanType === 'data') {
-        newPlan.data_allocated = dataMB || preservedDataAllocated;
-        newPlan.data_used = preservedDataUsed;
+        newPlan.data_allocated = dataMB || 0;
+        newPlan.data_used = 0;
         newPlan.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       }
 
@@ -243,6 +252,22 @@ class PlanService {
         throw error;
       }
 
+      // If no bonus record exists, create one
+      if (!data) {
+        const { data: newRecord, error: insertError } = await supabase
+          .from('daily_bonus_claims')
+          .insert({
+            user_id: user.id,
+            last_claimed_at: new Date(0).toISOString(), // Set to epoch so bonus is immediately available
+            next_claim_at: new Date().toISOString() // Available now
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        return newRecord;
+      }
+
       return data;
     } catch (error) {
       console.error('Error fetching bonus claim status:', error);
@@ -263,6 +288,12 @@ class PlanService {
       const now = new Date();
       const nextClaimTime = new Date(bonusStatus.next_claim_at);
 
+      console.log('Bonus claim check:', {
+        now: now.toISOString(),
+        nextClaimTime: nextClaimTime.toISOString(),
+        canClaim: now >= nextClaimTime
+      });
+
       if (now < nextClaimTime) {
         const hoursLeft = Math.ceil((nextClaimTime.getTime() - now.getTime()) / (1000 * 60 * 60));
         return { success: false, message: `Next bonus available in ${hoursLeft}h` };
@@ -282,20 +313,24 @@ class PlanService {
 
       // Add bonus to wallet
       const bonusAmount = 5000; // ₦50 in kobo
-      const { data: wallet } = await supabase
+      const { data: wallet, error: walletError } = await supabase
         .from('wallet')
         .select('balance')
         .eq('user_id', user.id)
         .single();
 
+      if (walletError) throw walletError;
+
       if (wallet) {
-        await supabase
+        const { error: updateWalletError } = await supabase
           .from('wallet')
           .update({ 
             balance: wallet.balance + bonusAmount,
             updated_at: new Date().toISOString()
           })
           .eq('user_id', user.id);
+
+        if (updateWalletError) throw updateWalletError;
 
         // Record transaction
         await supabase
