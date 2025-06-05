@@ -1,97 +1,57 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import SplashScreen from '../components/SplashScreen';
-import OnboardingScreen from '../components/OnboardingScreen';
-import AuthScreen from '../components/AuthScreen';
-import HomeScreen from '../components/HomeScreen';
-import PlansScreen from '../components/PlansScreen';
-import UsageScreen from '../components/UsageScreen';
-import WalletScreen from '../components/WalletScreen';
-import ProfileScreen from '../components/ProfileScreen';
-import ReferralScreen from '../components/ReferralScreen';
-import SettingsScreen from '../components/SettingsScreen';
-import SupportScreen from '../components/SupportScreen';
-import CurrentPlanScreen from '../components/CurrentPlanScreen';
-import AppNavigation from '../components/AppNavigation';
-import { toast } from 'sonner';
+import SplashScreen from '@/components/SplashScreen';
+import OnboardingScreen from '@/components/OnboardingScreen';
+import AuthScreen from '@/components/AuthScreen';
+import AppNavigation from '@/components/AppNavigation';
+import HomeScreen from '@/components/HomeScreen';
+import PlansScreen from '@/components/PlansScreen';
+import UsageScreen from '@/components/UsageScreen';
+import WalletScreen from '@/components/WalletScreen';
+import ReferralScreen from '@/components/ReferralScreen';
+import ProfileScreen from '@/components/ProfileScreen';
+import SupportScreen from '@/components/SupportScreen';
+import SettingsScreen from '@/components/SettingsScreen';
+import CurrentPlanScreen from '@/components/CurrentPlanScreen';
 
 const Index = () => {
-  const [currentScreen, setCurrentScreen] = useState<'splash' | 'onboarding' | 'auth' | 'main'>('splash');
+  const { user, profile, loading, isFirstTime, setIsFirstTime } = useAuth();
+  const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
-  const { user, loading, refreshWallet } = useAuth();
 
-  // Handle Paystack success redirect
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const paymentStatus = urlParams.get('payment');
-    const amount = urlParams.get('amount');
-    const reference = urlParams.get('reference');
-    const trxref = urlParams.get('trxref');
-    
-    if (paymentStatus === 'success' || reference || trxref) {
-      console.log('Payment success detected, refreshing wallet');
-      
-      // Clear URL params to prevent repeated processing
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      // Show success message
-      if (amount) {
-        toast.success(`Payment successful! ₦${amount} added to your wallet.`);
-      } else {
-        toast.success('Payment successful! Your wallet has been updated.');
-      }
-      
-      // Refresh wallet and navigate to wallet tab
-      setTimeout(() => {
-        refreshWallet();
-        setActiveTab('wallet');
-        setCurrentScreen('main');
-      }, 1000);
-    }
-  }, [refreshWallet]);
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2000);
 
-  const handleSplashComplete = () => {
-    setCurrentScreen('onboarding');
-  };
+    return () => clearTimeout(timer);
+  }, []);
 
-  const handleOnboardingComplete = () => {
-    setCurrentScreen('auth');
-  };
-
-  const handleAuthComplete = () => {
-    setCurrentScreen('main');
-  };
-
-  // Show splash screen first
-  if (currentScreen === 'splash') {
-    return <SplashScreen onComplete={handleSplashComplete} />;
+  if (showSplash) {
+    return <SplashScreen />;
   }
 
-  // Show onboarding if not completed auth flow
-  if (currentScreen === 'onboarding') {
-    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
-  }
-
-  // Show loading while checking auth
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center">
-        <div className="text-white text-center">
-          <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-          <p>Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-blue-600">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // Show auth screen if not authenticated
-  if (!user || currentScreen === 'auth') {
-    return <AuthScreen onComplete={handleAuthComplete} />;
+  if (!user) {
+    return <AuthScreen />;
   }
 
-  // Show main app for authenticated users
-  const renderMainContent = () => {
+  if (isFirstTime && profile) {
+    return <OnboardingScreen onComplete={() => setIsFirstTime(false)} />;
+  }
+
+  const renderScreen = () => {
     switch (activeTab) {
       case 'home':
         return <HomeScreen onTabChange={setActiveTab} />;
@@ -101,16 +61,16 @@ const Index = () => {
         return <UsageScreen />;
       case 'wallet':
         return <WalletScreen />;
-      case 'profile':
-        return <ProfileScreen onTabChange={setActiveTab} />;
-      case 'current-plan':
-        return <CurrentPlanScreen onBack={() => setActiveTab('home')} onTabChange={setActiveTab} />;
       case 'referral':
         return <ReferralScreen />;
-      case 'settings':
-        return <SettingsScreen onTabChange={setActiveTab} />;
+      case 'profile':
+        return <ProfileScreen />;
       case 'support':
         return <SupportScreen />;
+      case 'settings':
+        return <SettingsScreen />;
+      case 'current-plan':
+        return <CurrentPlanScreen onTabChange={setActiveTab} />;
       default:
         return <HomeScreen onTabChange={setActiveTab} />;
     }
@@ -118,7 +78,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      {renderMainContent()}
+      {renderScreen()}
       <AppNavigation activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );

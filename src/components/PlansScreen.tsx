@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
-import { Shield, Zap, Wallet, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, Zap, Wallet, CheckCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { planService } from '../services/planService';
+import { planService, type UserPlan } from '../services/planService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -11,6 +11,7 @@ const PlansScreen = () => {
   const [selectedTab, setSelectedTab] = useState<'free' | 'data' | 'payg'>('free');
   const [loading, setLoading] = useState(false);
   const [selectedDataPlan, setSelectedDataPlan] = useState<string | null>(null);
+  const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
   const { user, wallet, refreshWallet } = useAuth();
   const { theme } = useTheme();
 
@@ -20,6 +21,33 @@ const PlansScreen = () => {
     { id: '5gb', size: '5GB', sizeInMB: 5000, price: 100000, displayPrice: '₦1,000', validity: '30 days' },
     { id: '10gb', size: '10GB', sizeInMB: 10000, price: 200000, displayPrice: '₦2,000', validity: '30 days' }
   ];
+
+  useEffect(() => {
+    if (user) {
+      loadCurrentPlan();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    // Listen for plan updates
+    const handlePlanUpdate = () => {
+      loadCurrentPlan();
+    };
+
+    window.addEventListener('plan-updated', handlePlanUpdate);
+    return () => {
+      window.removeEventListener('plan-updated', handlePlanUpdate);
+    };
+  }, []);
+
+  const loadCurrentPlan = async () => {
+    try {
+      const plan = await planService.getCurrentPlan();
+      setCurrentPlan(plan);
+    } catch (error) {
+      console.error('Error loading current plan:', error);
+    }
+  };
 
   const handlePlanSwitch = async (planType: 'free' | 'payg') => {
     if (!user) {
@@ -40,6 +68,32 @@ const PlansScreen = () => {
     } catch (error) {
       console.error('Error switching plan:', error);
       toast.error('Failed to switch plan');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSwitchToDataPlan = async () => {
+    if (!user) {
+      toast.error('Please login to switch to data plan');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Switch to data plan with 0 MB initially (will preserve existing data if any)
+      const success = await planService.switchPlan('data', 0);
+      if (success) {
+        toast.success('Successfully switched to Data Plan');
+        // Trigger real-time updates
+        window.dispatchEvent(new CustomEvent('plan-updated'));
+        await loadCurrentPlan();
+      } else {
+        toast.error('Failed to switch to data plan');
+      }
+    } catch (error) {
+      console.error('Error switching to data plan:', error);
+      toast.error('Failed to switch to data plan');
     } finally {
       setLoading(false);
     }
@@ -77,6 +131,7 @@ const PlansScreen = () => {
         // Trigger real-time updates
         window.dispatchEvent(new CustomEvent('plan-updated'));
         window.dispatchEvent(new CustomEvent('wallet-updated'));
+        await loadCurrentPlan();
       } else {
         toast.error(result.message);
       }
@@ -180,10 +235,10 @@ const PlansScreen = () => {
 
             <button 
               onClick={() => handlePlanSwitch('free')}
-              disabled={loading}
+              disabled={loading || currentPlan?.plan_type === 'free'}
               className="w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl font-semibold text-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
             >
-              {loading ? 'Switching...' : 'Switch to Free Plan'}
+              {currentPlan?.plan_type === 'free' ? 'Current Plan' : loading ? 'Switching...' : 'Switch to Free Plan'}
             </button>
           </div>
         </div>
@@ -192,6 +247,28 @@ const PlansScreen = () => {
       {/* Buy Data Plans */}
       {selectedTab === 'data' && (
         <div className="px-6 mt-6">
+          {/* Switch to Data Plan Button (if not already on data plan) */}
+          {currentPlan?.plan_type !== 'data' && (
+            <div className={`rounded-2xl p-4 shadow-lg border mb-4 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Switch to Data Plan</h3>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
+                    Switch first to preserve existing data
+                  </p>
+                </div>
+                <button 
+                  onClick={handleSwitchToDataPlan}
+                  disabled={loading}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50"
+                >
+                  <span>{loading ? 'Switching...' : 'Switch'}</span>
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-4">
             {dataPlans.map((plan) => (
               <div key={plan.id} className={`rounded-2xl p-6 shadow-lg border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
@@ -259,10 +336,10 @@ const PlansScreen = () => {
 
             <button 
               onClick={() => handlePlanSwitch('payg')}
-              disabled={loading}
+              disabled={loading || currentPlan?.plan_type === 'payg'}
               className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl font-semibold text-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
             >
-              {loading ? 'Switching...' : 'Switch to Pay-As-You-Go'}
+              {currentPlan?.plan_type === 'payg' ? 'Current Plan' : loading ? 'Switching...' : 'Switch to Pay-As-You-Go'}
             </button>
           </div>
         </div>

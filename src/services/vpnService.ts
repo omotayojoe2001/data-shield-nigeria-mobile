@@ -59,7 +59,7 @@ class VPNService {
     this.stats.location = 'Lagos, Nigeria';
     this.stats.speed = '12.5 Mbps';
     
-    // Start simulating data usage immediately
+    // Start simulating data usage immediately with faster intervals for testing
     this.startDataUsageSimulation();
     
     console.log("VPN Connected - starting real-time data usage");
@@ -95,11 +95,11 @@ class VPNService {
     // Clear any existing intervals
     this.stopDataUsageSimulation();
     
-    // Simulate data usage every 5 seconds for faster testing
+    // Simulate data usage every 3 seconds for faster testing and live deductions
     this.dataUsageInterval = setInterval(() => {
       if (this.stats.isConnected) {
-        // Simulate random data usage (0.5-2 MB per interval)
-        const newDataUsed = Math.random() * 1.5 + 0.5;
+        // Simulate realistic data usage (0.3-1.5 MB per interval)
+        const newDataUsed = Math.random() * 1.2 + 0.3;
         // Calculate data saved based on compression (60-70% savings)
         const savingsRate = 0.6 + Math.random() * 0.1;
         const newDataSaved = newDataUsed * savingsRate;
@@ -107,12 +107,12 @@ class VPNService {
         this.stats.dataUsed += newDataUsed;
         this.stats.dataSaved += newDataSaved;
         
-        // Trigger data usage event for billing and plan deduction
+        // Trigger data usage event for billing and plan deduction with precise timing
         this.onDataUsage(newDataUsed);
         
         console.log(`VPN Usage: +${newDataUsed.toFixed(2)}MB (Total: ${this.stats.dataUsed.toFixed(2)}MB)`);
       }
-    }, 5000); // Every 5 seconds for faster testing
+    }, 3000); // Every 3 seconds for more responsive live deductions
 
     // Simulate speed variations
     this.speedTestInterval = setInterval(() => {
@@ -121,7 +121,7 @@ class VPNService {
         this.stats.uploadSpeed = 6 + Math.random() * 6;
         this.stats.speed = `${this.stats.downloadSpeed.toFixed(1)} Mbps`;
       }
-    }, 3000);
+    }, 2000);
   }
 
   private stopDataUsageSimulation() {
@@ -136,12 +136,12 @@ class VPNService {
   }
 
   private onDataUsage(dataMB: number) {
-    // This will be called to trigger billing and plan deduction
+    // This will be called to trigger billing and plan deduction with high precision
     const event = new CustomEvent('vpn-data-usage', {
       detail: { dataMB, timestamp: new Date() }
     });
     window.dispatchEvent(event);
-    console.log(`Data usage event dispatched: ${dataMB.toFixed(2)}MB`);
+    console.log(`Data usage event dispatched: ${dataMB.toFixed(2)}MB at ${new Date().toLocaleTimeString()}`);
   }
 
   // Get today's app-wise usage (dummy data with randomized values)

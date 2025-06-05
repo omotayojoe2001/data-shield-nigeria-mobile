@@ -42,7 +42,15 @@ serve(async (req) => {
     const paystackSecretKey = Deno.env.get("PAYSTACK_SECRET_KEY");
     if (!paystackSecretKey) {
       console.error("Paystack secret key not found in environment variables");
-      throw new Error("Payment service temporarily unavailable. Please add your Paystack secret key in the settings.");
+      return new Response(
+        JSON.stringify({ 
+          error: "Payment service not configured. Please contact support or check your payment settings." 
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 503,
+        }
+      );
     }
 
     console.log("Initializing Paystack payment...", { amount, email, type });
