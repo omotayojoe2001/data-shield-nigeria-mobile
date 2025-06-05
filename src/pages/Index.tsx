@@ -44,7 +44,7 @@ const Index = () => {
   }
 
   if (!user) {
-    return <AuthScreen />;
+    return <AuthScreen onComplete={() => {}} />;
   }
 
   if (isFirstTime && profile) {
@@ -68,7 +68,7 @@ const Index = () => {
       case 'support':
         return <SupportScreen />;
       case 'settings':
-        return <SettingsScreen />;
+        return <SettingsScreen onTabChange={setActiveTab} />;
       case 'current-plan':
         return <CurrentPlanScreen onTabChange={setActiveTab} />;
       default:

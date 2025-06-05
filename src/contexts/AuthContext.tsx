@@ -21,6 +21,8 @@ interface AuthContextType {
   profile: Profile | null;
   wallet: Wallet | null;
   loading: boolean;
+  isFirstTime: boolean;
+  setIsFirstTime: (value: boolean) => void;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -46,6 +48,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isFirstTime, setIsFirstTime] = useState(false);
 
   const cleanupAuthState = () => {
     Object.keys(localStorage).forEach((key) => {
@@ -115,6 +118,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             fetchProfile(session.user.id),
             fetchWallet(session.user.id)
           ]);
+          
+          // Check if this is first time login
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .single();
+          
+          if (profileData && !profileData.full_name) {
+            setIsFirstTime(true);
+          }
         }
       } catch (error) {
         console.error('Error getting session:', error);
@@ -143,6 +157,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } else if (event === 'SIGNED_OUT') {
           setProfile(null);
           setWallet(null);
+          setIsFirstTime(false);
         }
         
         setLoading(false);
@@ -245,6 +260,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     profile,
     wallet,
     loading,
+    isFirstTime,
+    setIsFirstTime,
     signUp,
     signIn,
     signOut,

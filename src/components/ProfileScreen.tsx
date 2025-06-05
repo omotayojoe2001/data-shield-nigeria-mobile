@@ -120,11 +120,11 @@ const ProfileScreen = () => {
       // Create unique file name
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `profile-images/${fileName}`;
+      const filePath = `${user.id}/${fileName}`;
 
-      // Upload to Supabase Storage
+      // Upload to Supabase Storage - using 'profile-images' bucket
       const { error: uploadError } = await supabase.storage
-        .from('profiles')
+        .from('profile-images')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: true
@@ -137,7 +137,7 @@ const ProfileScreen = () => {
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('profiles')
+        .from('profile-images')
         .getPublicUrl(filePath);
 
       // Update profile with image URL
