@@ -56,7 +56,7 @@ const Index = () => {
       case 'home':
         return <HomeScreen onTabChange={setActiveTab} />;
       case 'plans':
-        return <PlansScreen />;
+        return <PlansScreen onTabChange={setActiveTab} />;
       case 'usage':
         return <UsageScreen />;
       case 'wallet':

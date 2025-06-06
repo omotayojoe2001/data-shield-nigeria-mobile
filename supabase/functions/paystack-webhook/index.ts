@@ -21,6 +21,8 @@ serve(async (req) => {
     const body = await req.text();
     const event = JSON.parse(body);
 
+    console.log("Webhook received:", event.event);
+
     // Create Supabase client with service role key
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -101,48 +103,6 @@ serve(async (req) => {
       if (transactionError) {
         console.error("Error recording transaction:", transactionError);
         throw transactionError;
-      }
-
-      // If it's a data plan purchase, create/update user plan
-      if (type === 'data') {
-        const dataMB = metadata?.data_mb || 1024; // Default to 1GB
-        
-        // Deactivate current plan
-        await supabase
-          .from('user_plans')
-          .update({ status: 'inactive' })
-          .eq('user_id', userId)
-          .eq('status', 'active');
-
-        // Create new data plan
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + 30); // 30 days
-
-        const { error: planError } = await supabase
-          .from('user_plans')
-          .insert({
-            user_id: userId,
-            plan_type: 'data',
-            status: 'active',
-            data_allocated: dataMB,
-            data_used: 0,
-            expires_at: expiryDate.toISOString()
-          });
-
-        if (planError) {
-          console.error("Error creating data plan:", planError);
-        }
-
-        // Record plan history
-        await supabase
-          .from('plan_history')
-          .insert({
-            user_id: userId,
-            to_plan: 'data',
-            notes: `Purchased ${dataMB}MB data plan - ${reference}`
-          });
-
-        console.log(`Created data plan with ${dataMB}MB for user ${userId}`);
       }
 
       console.log("Payment processed successfully");

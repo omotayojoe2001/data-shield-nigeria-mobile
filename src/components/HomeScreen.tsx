@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -41,16 +42,12 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
       loadPlanData();
     };
 
-    const handleWalletUpdate = () => {
-      // Wallet updates are handled by AuthContext
-    };
-
     window.addEventListener('plan-updated', handlePlanUpdate);
-    window.addEventListener('wallet-updated', handleWalletUpdate);
+    window.addEventListener('wallet-updated', handlePlanUpdate);
 
     return () => {
       window.removeEventListener('plan-updated', handlePlanUpdate);
-      window.removeEventListener('wallet-updated', handleWalletUpdate);
+      window.removeEventListener('wallet-updated', handlePlanUpdate);
     };
   }, []);
 
@@ -75,6 +72,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
       if (vpnStats.isConnected) {
         await vpnService.disconnect();
         billingService.stopPayAsYouGoBilling();
+        toast.success('VPN disconnected');
       } else {
         // Check if user can connect based on their plan
         const plan = await planService.getCurrentPlan();
@@ -101,7 +99,11 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         
         await vpnService.connect();
         billingService.startPayAsYouGoBilling();
+        toast.success('VPN connected successfully!');
       }
+    } catch (error) {
+      console.error('VPN toggle error:', error);
+      toast.error('Failed to toggle VPN connection');
     } finally {
       setLoading(false);
     }
@@ -160,13 +162,6 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   const planInfo = getPlanDisplayInfo();
   const canClaimBonus = bonusStatus && new Date() >= new Date(bonusStatus.next_claim_at);
 
-  console.log('Bonus claim status:', {
-    bonusStatus,
-    canClaimBonus,
-    now: new Date().toISOString(),
-    nextClaim: bonusStatus?.next_claim_at
-  });
-
   return (
     <div className={`min-h-screen pb-24 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-white'}`}>
       {/* Header */}
@@ -208,7 +203,14 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
                   : 'bg-green-500 hover:bg-green-600 text-white'
               } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              {loading ? 'Connecting...' : (vpnStats.isConnected ? 'Disconnect' : 'Connect')}
+              {loading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>{vpnStats.isConnected ? 'Disconnecting...' : 'Connecting...'}</span>
+                </div>
+              ) : (
+                vpnStats.isConnected ? 'Disconnect' : 'Connect'
+              )}
             </button>
           </div>
 
@@ -268,7 +270,14 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
             disabled={!canClaimBonus || bonusLoading}
             className="w-full py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-blue-900 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {bonusLoading ? 'Claiming...' : (canClaimBonus ? 'Claim ₦50 Bonus' : 'Bonus Claimed')}
+            {bonusLoading ? (
+              <div className="flex items-center justify-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-900"></div>
+                <span>Claiming...</span>
+              </div>
+            ) : (
+              canClaimBonus ? 'Claim ₦50 Bonus' : 'Bonus Claimed'
+            )}
           </button>
         </div>
       </div>

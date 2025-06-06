@@ -12,7 +12,6 @@ export interface UserPlan {
   daily_reset_at?: string;
   created_at: string;
   updated_at: string;
-  preserved_data?: number; // For storing unused data when switching plans
 }
 
 export interface DailyBonusClaim {
@@ -81,13 +80,6 @@ class PlanService {
       if (!user) return false;
 
       const currentPlan = await this.getCurrentPlan();
-      let preservedData = 0;
-
-      // Calculate preserved data when switching away from data plan
-      if (currentPlan && currentPlan.plan_type === 'data') {
-        preservedData = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
-        console.log(`Preserving ${preservedData}MB from current data plan`);
-      }
 
       // Deactivate current plan if it exists
       if (currentPlan) {
@@ -95,8 +87,7 @@ class PlanService {
           .from('user_plans')
           .update({ 
             status: 'inactive', 
-            updated_at: new Date().toISOString(),
-            preserved_data: preservedData // Store preserved data
+            updated_at: new Date().toISOString()
           })
           .eq('id', currentPlan.id);
 
@@ -107,7 +98,7 @@ class PlanService {
             user_id: user.id,
             from_plan: currentPlan.plan_type,
             to_plan: newPlanType,
-            notes: `Switched from ${currentPlan.plan_type} to ${newPlanType}${preservedData > 0 ? ` (preserved ${preservedData}MB)` : ''}`
+            notes: `Switched from ${currentPlan.plan_type} to ${newPlanType}`
           });
       }
 
@@ -126,24 +117,7 @@ class PlanService {
       } else if (newPlanType === 'payg') {
         newPlan.data_allocated = 0; // Unlimited for PAYG
       } else if (newPlanType === 'data') {
-        // If switching back to data plan and we have preserved data, use it
-        if (preservedData > 0) {
-          newPlan.data_allocated = preservedData + (dataMB || 0);
-        } else {
-          // Check if user had previous data plan with preserved data
-          const { data: previousPlan } = await supabase
-            .from('user_plans')
-            .select('preserved_data')
-            .eq('user_id', user.id)
-            .eq('plan_type', 'data')
-            .not('preserved_data', 'is', null)
-            .order('updated_at', { ascending: false })
-            .limit(1)
-            .single();
-
-          const previousPreservedData = previousPlan?.preserved_data || 0;
-          newPlan.data_allocated = previousPreservedData + (dataMB || 0);
-        }
+        newPlan.data_allocated = dataMB || 0;
         newPlan.data_used = 0;
         newPlan.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       }
@@ -182,13 +156,11 @@ class PlanService {
 
       const currentPlan = await this.getCurrentPlan();
       let newDataAllocated = dataMB;
-      let newDataUsed = 0;
 
       // If user is already on data plan, add to existing allocation
       if (currentPlan && currentPlan.plan_type === 'data') {
         const remainingData = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
         newDataAllocated = remainingData + dataMB;
-        newDataUsed = currentPlan.data_used;
         
         // Update existing plan instead of creating new one
         const { error: updateError } = await supabase
