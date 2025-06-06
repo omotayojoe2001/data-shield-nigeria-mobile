@@ -38,21 +38,9 @@ serve(async (req) => {
       throw new Error("Amount and email are required");
     }
 
-    // Initialize Paystack payment
-    const paystackSecretKey = Deno.env.get("PAYSTACK_SECRET_KEY");
-    if (!paystackSecretKey) {
-      console.error("Paystack secret key not found in environment variables");
-      return new Response(
-        JSON.stringify({ 
-          error: "Payment service not configured. Please contact support or check your payment settings." 
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 503,
-        }
-      );
-    }
-
+    // Updated Paystack secret key
+    const paystackSecretKey = "sk_test_3b4296afe558d06a3166d41b24283bdf5d9afee7";
+    
     console.log("Initializing Paystack payment...", { amount, email, type });
 
     const paystackResponse = await fetch("https://api.paystack.co/transaction/initialize", {

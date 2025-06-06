@@ -12,6 +12,7 @@ export interface UserPlan {
   daily_reset_at?: string;
   created_at: string;
   updated_at: string;
+  preserved_data?: number; // For storing unused data when switching plans
 }
 
 export interface DailyBonusClaim {
@@ -80,29 +81,23 @@ class PlanService {
       if (!user) return false;
 
       const currentPlan = await this.getCurrentPlan();
-      let preservedDataAllocated = 0;
-      let preservedDataUsed = 0;
+      let preservedData = 0;
 
-      // Preserve existing data when switching to/from data plan
+      // Calculate preserved data when switching away from data plan
       if (currentPlan && currentPlan.plan_type === 'data') {
-        // When switching FROM data plan, preserve remaining data for potential return
-        preservedDataAllocated = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
-        preservedDataUsed = 0;
-        
-        // Store the preserved data in a temporary field or handle it differently
-        console.log(`Preserving ${preservedDataAllocated}MB from previous data plan`);
-      }
-
-      // If switching TO data plan and we have preserved data, use it
-      if (newPlanType === 'data' && preservedDataAllocated > 0) {
-        dataMB = (dataMB || 0) + preservedDataAllocated;
+        preservedData = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
+        console.log(`Preserving ${preservedData}MB from current data plan`);
       }
 
       // Deactivate current plan if it exists
       if (currentPlan) {
         await supabase
           .from('user_plans')
-          .update({ status: 'inactive', updated_at: new Date().toISOString() })
+          .update({ 
+            status: 'inactive', 
+            updated_at: new Date().toISOString(),
+            preserved_data: preservedData // Store preserved data
+          })
           .eq('id', currentPlan.id);
 
         // Record plan change
@@ -112,7 +107,7 @@ class PlanService {
             user_id: user.id,
             from_plan: currentPlan.plan_type,
             to_plan: newPlanType,
-            notes: `Switched from ${currentPlan.plan_type} to ${newPlanType}${preservedDataAllocated > 0 ? ` (preserved ${preservedDataAllocated}MB)` : ''}`
+            notes: `Switched from ${currentPlan.plan_type} to ${newPlanType}${preservedData > 0 ? ` (preserved ${preservedData}MB)` : ''}`
           });
       }
 
@@ -131,7 +126,24 @@ class PlanService {
       } else if (newPlanType === 'payg') {
         newPlan.data_allocated = 0; // Unlimited for PAYG
       } else if (newPlanType === 'data') {
-        newPlan.data_allocated = dataMB || 0;
+        // If switching back to data plan and we have preserved data, use it
+        if (preservedData > 0) {
+          newPlan.data_allocated = preservedData + (dataMB || 0);
+        } else {
+          // Check if user had previous data plan with preserved data
+          const { data: previousPlan } = await supabase
+            .from('user_plans')
+            .select('preserved_data')
+            .eq('user_id', user.id)
+            .eq('plan_type', 'data')
+            .not('preserved_data', 'is', null)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          const previousPreservedData = previousPlan?.preserved_data || 0;
+          newPlan.data_allocated = previousPreservedData + (dataMB || 0);
+        }
         newPlan.data_used = 0;
         newPlan.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       }
@@ -252,14 +264,15 @@ class PlanService {
         throw error;
       }
 
-      // If no bonus record exists, create one
+      // If no bonus record exists, create one that's immediately claimable
       if (!data) {
+        const now = new Date();
         const { data: newRecord, error: insertError } = await supabase
           .from('daily_bonus_claims')
           .insert({
             user_id: user.id,
-            last_claimed_at: new Date(0).toISOString(), // Set to epoch so bonus is immediately available
-            next_claim_at: new Date().toISOString() // Available now
+            last_claimed_at: new Date(0).toISOString(), // Epoch time
+            next_claim_at: now.toISOString() // Available immediately
           })
           .select()
           .single();
@@ -393,6 +406,8 @@ class PlanService {
       const currentPlan = await this.getCurrentPlan();
       if (!currentPlan) return false;
 
+      console.log(`Updating data usage: ${usageMB}MB for ${currentPlan.plan_type} plan`);
+
       // For free plan, check daily reset first
       if (currentPlan.plan_type === 'free') {
         await this.resetDailyFreeData();
@@ -401,6 +416,8 @@ class PlanService {
         if (updatedPlan) {
           const newUsage = updatedPlan.data_used + usageMB;
           const cappedUsage = Math.min(newUsage, updatedPlan.data_allocated);
+          
+          console.log(`Free plan: ${updatedPlan.data_used}MB -> ${cappedUsage}MB (allocated: ${updatedPlan.data_allocated}MB)`);
           
           await supabase
             .from('user_plans')
@@ -419,6 +436,8 @@ class PlanService {
         const cappedUsage = currentPlan.plan_type === 'data' 
           ? Math.min(newUsage, currentPlan.data_allocated) 
           : newUsage;
+
+        console.log(`${currentPlan.plan_type} plan: ${currentPlan.data_used}MB -> ${cappedUsage}MB`);
 
         await supabase
           .from('user_plans')

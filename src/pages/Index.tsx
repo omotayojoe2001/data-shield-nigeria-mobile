@@ -60,7 +60,7 @@ const Index = () => {
       case 'usage':
         return <UsageScreen />;
       case 'wallet':
-        return <WalletScreen />;
+        return <WalletScreen onTabChange={setActiveTab} />;
       case 'referral':
         return <ReferralScreen />;
       case 'profile':

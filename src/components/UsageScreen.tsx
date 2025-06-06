@@ -3,13 +3,17 @@ import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingDown, Smartphone, Globe, Settings, Eye, EyeOff } from 'lucide-react';
 import { vpnService } from '../services/vpnService';
 import { billingService, PAYG_RATE } from '../services/billingService';
+import { planService, type UserPlan } from '../services/planService';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const UsageScreen = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month'>('day');
   const [showDetails, setShowDetails] = useState(true);
   const [vpnStats, setVpnStats] = useState(vpnService.getStats());
+  const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
   const { theme } = useTheme();
+  const { user } = useAuth();
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -18,6 +22,21 @@ const UsageScreen = () => {
 
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      loadCurrentPlan();
+    }
+  }, [user]);
+
+  const loadCurrentPlan = async () => {
+    try {
+      const plan = await planService.getCurrentPlan();
+      setCurrentPlan(plan);
+    } catch (error) {
+      console.error('Error loading current plan:', error);
+    }
+  };
 
   const appUsage = vpnService.getAppUsage();
 
@@ -50,6 +69,7 @@ const UsageScreen = () => {
 
   const currentData = periodData[selectedPeriod];
   const totalCostToday = billingService.calculateDataCost(vpnStats.dataUsed);
+  const isPayAsYouGo = currentPlan?.plan_type === 'payg';
 
   return (
     <div className={`min-h-screen pb-24 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-white'}`}>
@@ -110,13 +130,30 @@ const UsageScreen = () => {
             </div>
           </div>
 
-          {/* Pay-As-You-Go Info */}
-          {selectedPeriod === 'day' && (
+          {/* Pay-As-You-Go Info - Only show if user is on PAYG plan */}
+          {isPayAsYouGo && selectedPeriod === 'day' && (
             <div className={`rounded-xl p-3 mb-4 ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'}`}>
               <div className="text-center">
                 <div className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>₦{(totalCostToday / 100).toFixed(2)}</div>
                 <div className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>Spent today (Pay-As-You-Go)</div>
                 <div className={`text-xs mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-blue-500'}`}>₦{(PAYG_RATE / 100).toFixed(2)} per MB • ₦200 per GB</div>
+              </div>
+            </div>
+          )}
+
+          {/* Current Plan Info */}
+          {currentPlan && currentPlan.plan_type !== 'payg' && (
+            <div className={`rounded-xl p-3 mb-4 ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'}`}>
+              <div className="text-center">
+                <div className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
+                  {currentPlan.plan_type === 'free' ? 'Free Plan' : 'Data Plan'}
+                </div>
+                <div className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
+                  {currentPlan.plan_type === 'free' 
+                    ? `${Math.max(0, currentPlan.data_allocated - currentPlan.data_used)}MB remaining today`
+                    : `${Math.max(0, currentPlan.data_allocated - currentPlan.data_used)}MB remaining`
+                  }
+                </div>
               </div>
             </div>
           )}
