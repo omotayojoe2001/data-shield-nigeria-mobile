@@ -29,7 +29,7 @@ const Index = () => {
   }, []);
 
   if (showSplash) {
-    return <SplashScreen />;
+    return <SplashScreen onComplete={() => setShowSplash(false)} />;
   }
 
   if (loading) {
