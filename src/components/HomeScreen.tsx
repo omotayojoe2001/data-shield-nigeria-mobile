@@ -3,9 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { vpnService } from '../services/vpnService';
-import { planService, type UserPlan, type DailyBonusClaim } from '../services/planService';
+import { planService, type UserPlan } from '../services/planService';
 import { billingService } from '../services/billingService';
-import CountdownTimer from './CountdownTimer';
+import DailyBonusSection from './DailyBonusSection';
 import { Power, ShieldCheck, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -19,8 +19,6 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   const [vpnStats, setVpnStats] = useState(vpnService.getStats());
   const [loading, setLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
-  const [bonusStatus, setBonusStatus] = useState<DailyBonusClaim | null>(null);
-  const [bonusLoading, setBonusLoading] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -44,24 +42,20 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
 
     window.addEventListener('plan-updated', handlePlanUpdate);
     window.addEventListener('wallet-updated', handlePlanUpdate);
+    window.addEventListener('bonus-updated', handlePlanUpdate);
 
     return () => {
       window.removeEventListener('plan-updated', handlePlanUpdate);
       window.removeEventListener('wallet-updated', handlePlanUpdate);
+      window.removeEventListener('bonus-updated', handlePlanUpdate);
     };
   }, []);
 
   const loadPlanData = async () => {
     try {
-      const [plan, bonus] = await Promise.all([
-        planService.getCurrentPlan(),
-        planService.getBonusClaimStatus()
-      ]);
+      const plan = await planService.getCurrentPlan();
       setCurrentPlan(plan);
-      setBonusStatus(bonus);
-      
       console.log('Loaded plan:', plan);
-      console.log('Loaded bonus status:', bonus);
     } catch (error) {
       console.error('Error loading plan data:', error);
     }
@@ -119,29 +113,6 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
     }
   };
 
-  const handleClaimBonus = async () => {
-    if (bonusLoading) return;
-    
-    setBonusLoading(true);
-    try {
-      const result = await planService.claimDailyBonus();
-      if (result.success) {
-        toast.success(result.message);
-        // Reload data to get updated bonus status
-        await loadPlanData();
-        // Refresh wallet in auth context
-        window.dispatchEvent(new CustomEvent('wallet-updated'));
-      } else {
-        toast.error(result.message);
-      }
-    } catch (error) {
-      console.error('Error claiming bonus:', error);
-      toast.error('Failed to claim bonus');
-    } finally {
-      setBonusLoading(false);
-    }
-  };
-
   const getPlanDisplayInfo = () => {
     if (!currentPlan) return { name: 'Free Plan', details: '100MB daily allowance' };
     
@@ -174,7 +145,6 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   };
 
   const planInfo = getPlanDisplayInfo();
-  const canClaimBonus = bonusStatus && new Date() >= new Date(bonusStatus.next_claim_at);
 
   return (
     <div className={`min-h-screen pb-24 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-white'}`}>
@@ -262,38 +232,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
 
       {/* Daily Bonus */}
       <div className="px-6 mt-6">
-        <div className={`rounded-3xl p-6 shadow-xl border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Daily Bonus</h3>
-              <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>Claim your daily ₦50 bonus!</p>
-              {bonusStatus && !canClaimBonus && (
-                <div className="mt-2">
-                  <CountdownTimer 
-                    targetTime={bonusStatus.next_claim_at}
-                    onComplete={loadPlanData}
-                  />
-                </div>
-              )}
-            </div>
-            <div className="text-3xl">🎁</div>
-          </div>
-          
-          <button 
-            onClick={handleClaimBonus}
-            disabled={!canClaimBonus || bonusLoading}
-            className="w-full py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-blue-900 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {bonusLoading ? (
-              <div className="flex items-center justify-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-900"></div>
-                <span>Claiming...</span>
-              </div>
-            ) : (
-              canClaimBonus ? 'Claim ₦50 Bonus' : 'Bonus Claimed'
-            )}
-          </button>
-        </div>
+        <DailyBonusSection />
       </div>
 
       {/* Quick Actions */}

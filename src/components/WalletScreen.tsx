@@ -1,21 +1,24 @@
+
 import React, { useState, useEffect } from 'react';
 import { Wallet, CreditCard, History, Gift, Plus, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/integrations/supabase/client';
-import { planService } from '../services/planService';
+import DailyBonusSection from './DailyBonusSection';
 import { toast } from 'sonner';
 
-const WalletScreen = () => {
+interface WalletScreenProps {
+  onTabChange: (tab: string) => void;
+}
+
+const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
   const { user, wallet, refreshWallet } = useAuth();
   const { theme } = useTheme();
   const [selectedTopUp, setSelectedTopUp] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [bonusLoading, setBonusLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [monthlyStats, setMonthlyStats] = useState({ spent: 0, saved: 0 });
-  const [canClaimBonus, setCanClaimBonus] = useState(false);
   
   const topUpAmounts = [500, 1000, 2000, 5000, 10000];
 
@@ -23,22 +26,24 @@ const WalletScreen = () => {
     if (user) {
       fetchTransactions();
       calculateMonthlyStats();
-      checkBonusStatus();
     }
   }, [user]);
 
-  const checkBonusStatus = async () => {
-    try {
-      const bonusStatus = await planService.getBonusClaimStatus();
-      if (bonusStatus) {
-        const now = new Date();
-        const nextClaimTime = new Date(bonusStatus.next_claim_at);
-        setCanClaimBonus(now >= nextClaimTime);
-      }
-    } catch (error) {
-      console.error('Error checking bonus status:', error);
-    }
-  };
+  useEffect(() => {
+    // Listen for wallet updates
+    const handleWalletUpdate = () => {
+      refreshWallet();
+      fetchTransactions();
+    };
+
+    window.addEventListener('wallet-updated', handleWalletUpdate);
+    window.addEventListener('bonus-updated', handleWalletUpdate);
+
+    return () => {
+      window.removeEventListener('wallet-updated', handleWalletUpdate);
+      window.removeEventListener('bonus-updated', handleWalletUpdate);
+    };
+  }, [refreshWallet]);
 
   const fetchTransactions = async () => {
     if (!user) return;
@@ -133,33 +138,6 @@ const WalletScreen = () => {
       toast.error('Failed to initialize payment');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleClaimBonus = async () => {
-    if (!canClaimBonus) {
-      toast.error('Bonus not available yet. Please wait for the next claim time.');
-      return;
-    }
-
-    setBonusLoading(true);
-    try {
-      const result = await planService.claimDailyBonus();
-      if (result.success) {
-        toast.success(result.message);
-        await refreshWallet();
-        await fetchTransactions();
-        setCanClaimBonus(false);
-        // Check again after 24 hours
-        setTimeout(() => checkBonusStatus(), 24 * 60 * 60 * 1000);
-      } else {
-        toast.error(result.message);
-      }
-    } catch (error: any) {
-      console.error('Bonus claim error:', error);
-      toast.error('Failed to claim bonus');
-    } finally {
-      setBonusLoading(false);
     }
   };
 
@@ -350,23 +328,8 @@ const WalletScreen = () => {
         </div>
 
         {/* Daily Bonus */}
-        <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-3xl p-6 text-white shadow-xl mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Gift size={24} />
-              <div>
-                <h3 className="text-lg font-semibold">Daily Bonus</h3>
-                <p className="text-sm">Claim your ₦50 bonus!</p>
-              </div>
-            </div>
-            <button 
-              onClick={handleClaimBonus}
-              disabled={bonusLoading || !canClaimBonus}
-              className="bg-white/20 px-4 py-2 rounded-xl font-semibold hover:bg-white/30 transition-all duration-300 disabled:opacity-50"
-            >
-              {bonusLoading ? 'Claiming...' : (canClaimBonus ? 'Claim' : 'Claimed')}
-            </button>
-          </div>
+        <div className="mb-6">
+          <DailyBonusSection compact />
         </div>
 
         {/* Recent Transactions */}

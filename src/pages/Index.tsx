@@ -68,7 +68,7 @@ const Index = () => {
       case 'support':
         return <SupportScreen />;
       case 'settings':
-        return <SettingsScreen onTabChange={setActiveTab} />;
+        return <SettingsScreen />;
       case 'current-plan':
         return <CurrentPlanScreen onTabChange={setActiveTab} />;
       default:
