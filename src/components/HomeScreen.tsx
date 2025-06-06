@@ -60,6 +60,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
       setCurrentPlan(plan);
       setBonusStatus(bonus);
       
+      console.log('Loaded plan:', plan);
       console.log('Loaded bonus status:', bonus);
     } catch (error) {
       console.error('Error loading plan data:', error);
@@ -67,6 +68,8 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   };
 
   const handleVPNToggle = async () => {
+    if (loading) return;
+    
     setLoading(true);
     try {
       if (vpnStats.isConnected) {
@@ -76,29 +79,36 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
       } else {
         // Check if user can connect based on their plan
         const plan = await planService.getCurrentPlan();
-        if (plan) {
-          if (plan.plan_type === 'free') {
-            const remainingData = Math.max(0, plan.data_allocated - plan.data_used);
-            if (remainingData <= 0) {
-              toast.error('Daily free data exhausted! Please upgrade your plan.');
-              return;
-            }
-          }
-          if (plan.plan_type === 'data') {
-            const remainingData = Math.max(0, plan.data_allocated - plan.data_used);
-            if (remainingData <= 0) {
-              toast.error('Data plan exhausted! Please buy more data or switch to Pay-As-You-Go.');
-              return;
-            }
-          }
-          if (plan.plan_type === 'payg' && (wallet?.balance || 0) < 100) { // Less than ₦1
-            toast.error('Insufficient wallet balance! Please top up your wallet.');
+        if (!plan) {
+          toast.error('Unable to load plan information. Please try again.');
+          return;
+        }
+        
+        if (plan.plan_type === 'free') {
+          const remainingData = Math.max(0, plan.data_allocated - plan.data_used);
+          if (remainingData <= 0) {
+            toast.error('Daily free data exhausted! Please upgrade your plan.');
             return;
           }
         }
         
+        if (plan.plan_type === 'data') {
+          const remainingData = Math.max(0, plan.data_allocated - plan.data_used);
+          if (remainingData <= 0) {
+            toast.error('Data plan exhausted! Please buy more data or switch to Pay-As-You-Go.');
+            return;
+          }
+        }
+        
+        if (plan.plan_type === 'payg' && (wallet?.balance || 0) < 100) { // Less than ₦1
+          toast.error('Insufficient wallet balance! Please top up your wallet.');
+          return;
+        }
+        
         await vpnService.connect();
-        billingService.startPayAsYouGoBilling();
+        if (plan.plan_type === 'payg') {
+          billingService.startPayAsYouGoBilling();
+        }
         toast.success('VPN connected successfully!');
       }
     } catch (error) {
@@ -110,11 +120,14 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   };
 
   const handleClaimBonus = async () => {
+    if (bonusLoading) return;
+    
     setBonusLoading(true);
     try {
       const result = await planService.claimDailyBonus();
       if (result.success) {
         toast.success(result.message);
+        // Reload data to get updated bonus status
         await loadPlanData();
         // Refresh wallet in auth context
         window.dispatchEvent(new CustomEvent('wallet-updated'));
@@ -122,6 +135,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         toast.error(result.message);
       }
     } catch (error) {
+      console.error('Error claiming bonus:', error);
       toast.error('Failed to claim bonus');
     } finally {
       setBonusLoading(false);

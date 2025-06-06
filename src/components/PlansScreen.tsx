@@ -7,7 +7,11 @@ import { planService, type UserPlan } from '../services/planService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-const PlansScreen = () => {
+interface PlansScreenProps {
+  onTabChange: (tab: string) => void;
+}
+
+const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
   const [selectedTab, setSelectedTab] = useState<'free' | 'data' | 'payg'>('free');
   const [loading, setLoading] = useState(false);
   const [selectedDataPlan, setSelectedDataPlan] = useState<string | null>(null);
@@ -55,6 +59,8 @@ const PlansScreen = () => {
       return;
     }
 
+    if (loading) return;
+
     setLoading(true);
     try {
       const success = await planService.switchPlan(planType);
@@ -62,6 +68,7 @@ const PlansScreen = () => {
         toast.success(`Successfully switched to ${planType === 'payg' ? 'Pay-As-You-Go' : 'Free Plan'}`);
         // Trigger real-time updates
         window.dispatchEvent(new CustomEvent('plan-updated'));
+        await loadCurrentPlan();
       } else {
         toast.error('Failed to switch plan');
       }
@@ -79,20 +86,14 @@ const PlansScreen = () => {
       return;
     }
 
+    if (loading) return;
+
     setLoading(true);
     try {
-      // Check if user has existing unused data from previous data plan
-      const existingDataRemaining = currentPlan?.plan_type === 'data' 
-        ? Math.max(0, currentPlan.data_allocated - currentPlan.data_used)
-        : 0;
-
-      // Switch to data plan, preserving existing data if any
-      const success = await planService.switchPlan('data', existingDataRemaining);
+      // Switch to data plan (this will preserve existing data if any)
+      const success = await planService.switchPlan('data');
       if (success) {
-        const message = existingDataRemaining > 0 
-          ? `Successfully switched to Data Plan with ${existingDataRemaining}MB preserved`
-          : 'Successfully switched to Data Plan';
-        toast.success(message);
+        toast.success('Successfully switched to Data Plan');
         
         // Trigger real-time updates
         window.dispatchEvent(new CustomEvent('plan-updated'));
@@ -119,6 +120,8 @@ const PlansScreen = () => {
       toast.error(`Insufficient balance. You need ₦${(plan.price / 100).toFixed(2)} but have ₦${(wallet.balance / 100).toFixed(2)}. Please top up your wallet.`);
       return;
     }
+
+    if (loading || selectedDataPlan === plan.id) return;
 
     setSelectedDataPlan(plan.id);
     setLoading(true);
@@ -256,37 +259,35 @@ const PlansScreen = () => {
       {/* Buy Data Plans */}
       {selectedTab === 'data' && (
         <div className="px-6 mt-6">
-          {/* Current Data Plan Status */}
-          {currentPlan && (
-            <div className={`rounded-2xl p-4 shadow-lg border mb-4 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <Database size={20} className={`${currentPlan.plan_type === 'data' ? 'text-green-600' : 'text-gray-400'}`} />
-                  <div>
-                    <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
-                      {currentPlan.plan_type === 'data' ? 'Data Plan Active' : 'Switch to Data Plan'}
-                    </h3>
-                    <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
-                      {currentPlan.plan_type === 'data' 
-                        ? `${Math.max(0, currentPlan.data_allocated - currentPlan.data_used)}MB remaining`
-                        : 'Preserve your data allocation across plan switches'
-                      }
-                    </p>
-                  </div>
+          {/* Switch to Data Plan Button */}
+          <div className={`rounded-2xl p-4 shadow-lg border mb-4 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Database size={20} className={`${currentPlan?.plan_type === 'data' ? 'text-green-600' : 'text-gray-400'}`} />
+                <div>
+                  <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
+                    {currentPlan?.plan_type === 'data' ? 'Data Plan Active' : 'Switch to Data Plan'}
+                  </h3>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
+                    {currentPlan?.plan_type === 'data' 
+                      ? `${Math.max(0, currentPlan.data_allocated - currentPlan.data_used)}MB remaining`
+                      : 'Switch to preserve data across plans'
+                    }
+                  </p>
                 </div>
-                {currentPlan.plan_type !== 'data' && (
-                  <button 
-                    onClick={handleSwitchToDataPlan}
-                    disabled={loading}
-                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50"
-                  >
-                    <span>{loading ? 'Switching...' : 'Switch'}</span>
-                    <ArrowRight size={16} />
-                  </button>
-                )}
               </div>
+              {currentPlan?.plan_type !== 'data' && (
+                <button 
+                  onClick={handleSwitchToDataPlan}
+                  disabled={loading}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50"
+                >
+                  <span>{loading ? 'Switching...' : 'Switch'}</span>
+                  <ArrowRight size={16} />
+                </button>
+              )}
             </div>
-          )}
+          </div>
 
           <div className="space-y-4">
             {dataPlans.map((plan) => (

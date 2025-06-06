@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface UserPlan {
@@ -81,6 +80,17 @@ class PlanService {
 
       const currentPlan = await this.getCurrentPlan();
 
+      // Store data plan information before switching
+      let preservedDataInfo: { allocated: number; used: number; expires_at?: string } | null = null;
+      
+      if (currentPlan?.plan_type === 'data') {
+        preservedDataInfo = {
+          allocated: currentPlan.data_allocated,
+          used: currentPlan.data_used,
+          expires_at: currentPlan.expires_at
+        };
+      }
+
       // Deactivate current plan if it exists
       if (currentPlan) {
         await supabase
@@ -117,9 +127,16 @@ class PlanService {
       } else if (newPlanType === 'payg') {
         newPlan.data_allocated = 0; // Unlimited for PAYG
       } else if (newPlanType === 'data') {
-        newPlan.data_allocated = dataMB || 0;
-        newPlan.data_used = 0;
-        newPlan.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        // Restore previous data plan or use provided data
+        if (preservedDataInfo && !dataMB) {
+          newPlan.data_allocated = preservedDataInfo.allocated;
+          newPlan.data_used = preservedDataInfo.used;
+          newPlan.expires_at = preservedDataInfo.expires_at;
+        } else {
+          newPlan.data_allocated = dataMB || 0;
+          newPlan.data_used = 0;
+          newPlan.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        }
       }
 
       const { error } = await supabase
@@ -387,14 +404,14 @@ class PlanService {
         const updatedPlan = await this.getCurrentPlan();
         if (updatedPlan) {
           const newUsage = updatedPlan.data_used + usageMB;
-          const cappedUsage = Math.min(newUsage, updatedPlan.data_allocated);
           
-          console.log(`Free plan: ${updatedPlan.data_used}MB -> ${cappedUsage}MB (allocated: ${updatedPlan.data_allocated}MB)`);
+          // Apply the usage update
+          console.log(`Free plan: ${updatedPlan.data_used}MB -> ${newUsage}MB (allocated: ${updatedPlan.data_allocated}MB)`);
           
           await supabase
             .from('user_plans')
             .update({
-              data_used: cappedUsage,
+              data_used: newUsage,
               updated_at: new Date().toISOString()
             })
             .eq('id', updatedPlan.id);
@@ -405,16 +422,13 @@ class PlanService {
       } else {
         // For data and payg plans
         const newUsage = currentPlan.data_used + usageMB;
-        const cappedUsage = currentPlan.plan_type === 'data' 
-          ? Math.min(newUsage, currentPlan.data_allocated) 
-          : newUsage;
 
-        console.log(`${currentPlan.plan_type} plan: ${currentPlan.data_used}MB -> ${cappedUsage}MB`);
+        console.log(`${currentPlan.plan_type} plan: ${currentPlan.data_used}MB -> ${newUsage}MB`);
 
         await supabase
           .from('user_plans')
           .update({
-            data_used: cappedUsage,
+            data_used: newUsage,
             updated_at: new Date().toISOString()
           })
           .eq('id', currentPlan.id);
