@@ -14,14 +14,12 @@ serve(async (req) => {
 
   try {
     const signature = req.headers.get("x-paystack-signature");
-    if (!signature) {
-      throw new Error("No signature provided");
-    }
+    console.log("Webhook received with signature:", signature ? "present" : "missing");
 
     const body = await req.text();
     const event = JSON.parse(body);
 
-    console.log("Webhook received:", event.event);
+    console.log("Webhook event:", event.event, "data:", JSON.stringify(event.data, null, 2));
 
     // Create Supabase client with service role key
     const supabase = createClient(
@@ -31,9 +29,17 @@ serve(async (req) => {
     );
 
     if (event.event === "charge.success") {
-      const { customer, amount, metadata, reference } = event.data;
+      const { customer, amount, metadata, reference, status } = event.data;
       const userId = metadata?.user_id;
       const type = metadata?.type || 'topup';
+
+      console.log("Processing successful charge:", {
+        userId,
+        amount,
+        reference,
+        status,
+        type
+      });
 
       if (!userId) {
         console.log("No user ID in metadata, skipping");
@@ -42,8 +48,6 @@ serve(async (req) => {
           status: 200,
         });
       }
-
-      console.log(`Processing payment for user ${userId}, amount: ${amount}, type: ${type}, reference: ${reference}`);
 
       // Check if transaction already processed
       const { data: existingTransaction } = await supabase
@@ -54,40 +58,49 @@ serve(async (req) => {
         .single();
 
       if (existingTransaction) {
-        console.log("Transaction already processed");
+        console.log("Transaction already processed for reference:", reference);
         return new Response(JSON.stringify({ received: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
         });
       }
 
-      // Update wallet balance
-      const { data: wallet } = await supabase
+      // Get current wallet balance
+      const { data: wallet, error: walletError } = await supabase
         .from('wallet')
         .select('balance')
         .eq('user_id', userId)
         .single();
 
-      if (wallet) {
-        const newBalance = wallet.balance + amount;
-        const { error: updateError } = await supabase
-          .from('wallet')
-          .update({ 
-            balance: newBalance, 
-            updated_at: new Date().toISOString() 
-          })
-          .eq('user_id', userId);
-
-        if (updateError) {
-          console.error("Error updating wallet:", updateError);
-          throw updateError;
-        }
-
-        console.log(`Updated wallet balance from ${wallet.balance} to ${newBalance}`);
-      } else {
-        console.error("Wallet not found for user");
+      if (walletError || !wallet) {
+        console.error("Error fetching wallet:", walletError);
         throw new Error("Wallet not found");
       }
+
+      const currentBalance = wallet.balance || 0;
+      const newBalance = currentBalance + amount;
+
+      console.log("Updating wallet balance:", {
+        currentBalance,
+        amountToAdd: amount,
+        newBalance
+      });
+
+      // Update wallet balance
+      const { error: updateError } = await supabase
+        .from('wallet')
+        .update({ 
+          balance: newBalance, 
+          updated_at: new Date().toISOString() 
+        })
+        .eq('user_id', userId);
+
+      if (updateError) {
+        console.error("Error updating wallet:", updateError);
+        throw updateError;
+      }
+
+      console.log("Wallet updated successfully from", currentBalance, "to", newBalance);
 
       // Record transaction
       const { error: transactionError } = await supabase
@@ -105,7 +118,23 @@ serve(async (req) => {
         throw transactionError;
       }
 
-      console.log("Payment processed successfully");
+      console.log("Transaction recorded successfully");
+
+      // Send wallet update event
+      try {
+        await supabase
+          .channel(`wallet-updates-${userId}`)
+          .send({
+            type: 'broadcast',
+            event: 'wallet_updated',
+            payload: { balance: newBalance, amount: amount }
+          });
+        console.log("Wallet update event sent");
+      } catch (eventError) {
+        console.log("Failed to send wallet update event:", eventError);
+      }
+
+      console.log("Payment processed successfully for reference:", reference);
     }
 
     return new Response(JSON.stringify({ received: true }), {

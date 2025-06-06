@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Wallet, CreditCard, History, Gift, Plus, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,6 +37,19 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
 
     window.addEventListener('wallet-updated', handleWalletUpdate);
     window.addEventListener('bonus-updated', handleWalletUpdate);
+
+    // Check for payment success in URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('payment') === 'success') {
+      const amount = urlParams.get('amount');
+      if (amount) {
+        toast.success(`Payment successful! ₦${amount} added to your wallet.`);
+        refreshWallet();
+        fetchTransactions();
+      }
+      // Clean up URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
 
     return () => {
       window.removeEventListener('wallet-updated', handleWalletUpdate);
@@ -97,45 +109,53 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
     
     setLoading(true);
     try {
-      // Check session before making payment
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
+      // Get current session to ensure user is authenticated
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
         toast.error('Please login again to continue');
+        setLoading(false);
         return;
       }
+
+      console.log('Initializing payment for user:', user.id, 'amount:', amount);
 
       const { data, error } = await supabase.functions.invoke('initialize-payment', {
         body: {
           amount: amount * 100, // Convert to kobo
           email: user.email,
           type: 'topup',
-          callback_url: `${window.location.origin}?payment=success&amount=${amount}`
+          callback_url: `${window.location.origin}/?payment=success&amount=${amount}`
+        },
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`
         }
       });
 
-      if (error) throw error;
+      console.log('Payment initialization response:', { data, error });
 
-      // Open Paystack in new tab and handle success via URL params
-      if (data.authorization_url) {
-        const newWindow = window.open(data.authorization_url, '_blank');
+      if (error) {
+        console.error('Payment initialization error:', error);
+        throw error;
+      }
+
+      if (data?.authorization_url) {
+        console.log('Opening Paystack URL:', data.authorization_url);
         
-        // Listen for payment completion
-        const checkPayment = setInterval(() => {
-          if (newWindow?.closed) {
-            clearInterval(checkPayment);
-            // Refresh wallet and check for success params
-            setTimeout(() => {
-              refreshWallet();
-              fetchTransactions();
-            }, 1000);
-          }
-        }, 1000);
-        
-        toast.success('Payment window opened. Complete payment in the new tab.');
+        // Store payment reference for verification
+        localStorage.setItem('pending_payment', JSON.stringify({
+          reference: data.reference,
+          amount: amount,
+          timestamp: Date.now()
+        }));
+
+        // Open Paystack in same window to maintain session
+        window.location.href = data.authorization_url;
+      } else {
+        throw new Error('No authorization URL received');
       }
     } catch (error) {
       console.error('Payment initialization error:', error);
-      toast.error('Failed to initialize payment');
+      toast.error('Failed to initialize payment. Please try again.');
     } finally {
       setLoading(false);
     }
