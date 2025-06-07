@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -102,9 +103,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Restore session from payment redirect
+  const restoreSessionAfterPayment = async () => {
+    const storedSession = sessionStorage.getItem('auth_session');
+    if (storedSession) {
+      try {
+        const sessionData = JSON.parse(storedSession);
+        // Set the session in Supabase
+        await supabase.auth.setSession({
+          access_token: sessionData.access_token,
+          refresh_token: sessionData.refresh_token
+        });
+        sessionStorage.removeItem('auth_session');
+        console.log('Session restored after payment');
+      } catch (error) {
+        console.error('Error restoring session:', error);
+        sessionStorage.removeItem('auth_session');
+      }
+    }
+  };
+
   useEffect(() => {
     const getSession = async () => {
       try {
+        // Check if we need to restore session after payment
+        await restoreSessionAfterPayment();
+
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) {
           console.error('Session error:', error);
@@ -215,6 +239,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
       
       cleanupAuthState();
+      sessionStorage.removeItem('auth_session');
+      sessionStorage.removeItem('paystack_payment');
       setUser(null);
       setSession(null);
       setProfile(null);

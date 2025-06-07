@@ -43,12 +43,16 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
     if (urlParams.get('payment') === 'success') {
       const amount = urlParams.get('amount');
       if (amount) {
-        toast.success(`Payment successful! ₦${amount} added to your wallet.`);
-        refreshWallet();
-        fetchTransactions();
+        toast.success(`Payment successful! ₦${amount} has been added to your wallet.`);
+        // Force refresh wallet and transactions
+        setTimeout(() => {
+          refreshWallet();
+          fetchTransactions();
+        }, 1000);
       }
-      // Clean up URL params
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // Clean up URL params without losing session
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
     }
 
     return () => {
@@ -56,6 +60,27 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
       window.removeEventListener('bonus-updated', handleWalletUpdate);
     };
   }, [refreshWallet]);
+
+  // Set up real-time wallet updates
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`wallet-updates-${user.id}`)
+      .on('broadcast', { event: 'wallet_updated' }, (payload) => {
+        console.log('Real-time wallet update received:', payload);
+        refreshWallet();
+        fetchTransactions();
+        if (payload.payload?.amount) {
+          toast.success(`₦${(payload.payload.amount / 100).toLocaleString()} added to your wallet!`);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, refreshWallet]);
 
   const fetchTransactions = async () => {
     if (!user) return;
@@ -124,7 +149,7 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
           amount: amount * 100, // Convert to kobo
           email: user.email,
           type: 'topup',
-          callback_url: `${window.location.origin}/?payment=success&amount=${amount}`
+          callback_url: `${window.location.origin}/?payment=success&amount=${amount}&ref=${Date.now()}`
         },
         headers: {
           Authorization: `Bearer ${sessionData.session.access_token}`
@@ -141,14 +166,22 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
       if (data?.authorization_url) {
         console.log('Opening Paystack URL:', data.authorization_url);
         
-        // Store payment reference for verification
-        localStorage.setItem('pending_payment', JSON.stringify({
+        // Store payment info in sessionStorage to survive redirects
+        sessionStorage.setItem('paystack_payment', JSON.stringify({
           reference: data.reference,
           amount: amount,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          user_id: user.id
         }));
 
-        // Open Paystack in same window to maintain session
+        // Store current session info to restore after redirect
+        sessionStorage.setItem('auth_session', JSON.stringify({
+          access_token: sessionData.session.access_token,
+          refresh_token: sessionData.session.refresh_token,
+          user: sessionData.session.user
+        }));
+
+        // Redirect to Paystack
         window.location.href = data.authorization_url;
       } else {
         throw new Error('No authorization URL received');
