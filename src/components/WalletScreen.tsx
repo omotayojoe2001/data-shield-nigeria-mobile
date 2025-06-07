@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Wallet, CreditCard, History, Gift, Plus, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,6 +15,7 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
   const { user, wallet, refreshWallet } = useAuth();
   const { theme } = useTheme();
   const [selectedTopUp, setSelectedTopUp] = useState<number | null>(null);
+  const [customAmount, setCustomAmount] = useState('');
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -44,11 +46,15 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
       const amount = urlParams.get('amount');
       if (amount) {
         toast.success(`Payment successful! ₦${amount} has been added to your wallet.`);
-        // Force refresh wallet and transactions
+        // Force refresh wallet and transactions multiple times
         setTimeout(() => {
           refreshWallet();
           fetchTransactions();
-        }, 1000);
+        }, 500);
+        setTimeout(() => {
+          refreshWallet();
+          fetchTransactions();
+        }, 2000);
       }
       // Clean up URL params without losing session
       const newUrl = window.location.pathname;
@@ -130,7 +136,7 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
   };
 
   const handleTopUp = async (amount: number) => {
-    if (!user || !selectedTopUp) return;
+    if (!user) return;
     
     setLoading(true);
     try {
@@ -144,12 +150,20 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
 
       console.log('Initializing payment for user:', user.id, 'amount:', amount);
 
+      // Store session data before payment
+      sessionStorage.setItem('pre_payment_session', JSON.stringify({
+        access_token: sessionData.session.access_token,
+        refresh_token: sessionData.session.refresh_token,
+        user_id: user.id,
+        amount: amount
+      }));
+
       const { data, error } = await supabase.functions.invoke('initialize-payment', {
         body: {
           amount: amount * 100, // Convert to kobo
           email: user.email,
           type: 'topup',
-          callback_url: `${window.location.origin}/?payment=success&amount=${amount}&ref=${Date.now()}`
+          callback_url: `${window.location.origin}/?payment=success&amount=${amount}&user_id=${user.id}&timestamp=${Date.now()}`
         },
         headers: {
           Authorization: `Bearer ${sessionData.session.access_token}`
@@ -164,21 +178,14 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
       }
 
       if (data?.authorization_url) {
-        console.log('Opening Paystack URL:', data.authorization_url);
+        console.log('Redirecting to Paystack:', data.authorization_url);
         
-        // Store payment info in sessionStorage to survive redirects
-        sessionStorage.setItem('paystack_payment', JSON.stringify({
+        // Store payment info
+        sessionStorage.setItem('paystack_payment_data', JSON.stringify({
           reference: data.reference,
           amount: amount,
-          timestamp: Date.now(),
-          user_id: user.id
-        }));
-
-        // Store current session info to restore after redirect
-        sessionStorage.setItem('auth_session', JSON.stringify({
-          access_token: sessionData.session.access_token,
-          refresh_token: sessionData.session.refresh_token,
-          user: sessionData.session.user
+          user_id: user.id,
+          timestamp: Date.now()
         }));
 
         // Redirect to Paystack
@@ -192,6 +199,19 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCustomAmountTopUp = () => {
+    const amount = parseInt(customAmount);
+    if (isNaN(amount) || amount < 100) {
+      toast.error('Please enter a valid amount (minimum ₦100)');
+      return;
+    }
+    if (amount > 1000000) {
+      toast.error('Maximum amount is ₦1,000,000');
+      return;
+    }
+    handleTopUp(amount);
   };
 
   const formatAmount = (amount: number) => {
@@ -369,6 +389,35 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
                 ₦{amount.toLocaleString()}
               </button>
             ))}
+          </div>
+
+          {/* Custom Amount Input */}
+          <div className="mb-6">
+            <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>
+              Or enter custom amount:
+            </label>
+            <div className="flex gap-3">
+              <input
+                type="number"
+                value={customAmount}
+                onChange={(e) => setCustomAmount(e.target.value)}
+                placeholder="Enter amount (min ₦100)"
+                min="100"
+                max="1000000"
+                className={`flex-1 px-4 py-3 rounded-xl border-2 font-medium transition-all duration-300 ${
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500' 
+                    : 'bg-white border-blue-200 text-blue-900 placeholder-blue-400 focus:border-blue-500'
+                } focus:outline-none`}
+              />
+              <button 
+                onClick={handleCustomAmountTopUp}
+                disabled={!customAmount || loading}
+                className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Pay
+              </button>
+            </div>
           </div>
 
           <button 

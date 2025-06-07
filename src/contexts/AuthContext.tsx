@@ -105,29 +105,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Restore session from payment redirect
   const restoreSessionAfterPayment = async () => {
-    const storedSession = sessionStorage.getItem('auth_session');
+    const storedSession = sessionStorage.getItem('pre_payment_session');
     if (storedSession) {
       try {
         const sessionData = JSON.parse(storedSession);
+        console.log('Restoring session after payment for user:', sessionData.user_id);
+        
         // Set the session in Supabase
         await supabase.auth.setSession({
           access_token: sessionData.access_token,
           refresh_token: sessionData.refresh_token
         });
-        sessionStorage.removeItem('auth_session');
-        console.log('Session restored after payment');
+        
+        // Clean up stored session
+        sessionStorage.removeItem('pre_payment_session');
+        console.log('Session restored successfully after payment');
+        
+        return true;
       } catch (error) {
-        console.error('Error restoring session:', error);
-        sessionStorage.removeItem('auth_session');
+        console.error('Error restoring session after payment:', error);
+        sessionStorage.removeItem('pre_payment_session');
+        return false;
       }
     }
+    return false;
   };
 
   useEffect(() => {
     const getSession = async () => {
       try {
         // Check if we need to restore session after payment
-        await restoreSessionAfterPayment();
+        const wasRestored = await restoreSessionAfterPayment();
+        
+        if (wasRestored) {
+          // Small delay to ensure session is properly set
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
 
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) {
@@ -239,8 +252,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
       
       cleanupAuthState();
-      sessionStorage.removeItem('auth_session');
-      sessionStorage.removeItem('paystack_payment');
+      sessionStorage.removeItem('pre_payment_session');
+      sessionStorage.removeItem('paystack_payment_data');
       setUser(null);
       setSession(null);
       setProfile(null);
