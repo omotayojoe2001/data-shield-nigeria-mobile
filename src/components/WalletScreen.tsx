@@ -33,6 +33,7 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
   useEffect(() => {
     // Listen for wallet updates
     const handleWalletUpdate = () => {
+      console.log('Wallet update event received');
       refreshWallet();
       fetchTransactions();
     };
@@ -45,16 +46,19 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
     if (urlParams.get('payment') === 'success') {
       const amount = urlParams.get('amount');
       if (amount) {
+        console.log('Payment success detected, amount:', amount);
         toast.success(`Payment successful! ₦${amount} has been added to your wallet.`);
-        // Force refresh wallet and transactions multiple times
-        setTimeout(() => {
+        
+        // Force multiple refreshes to ensure data is updated
+        const refreshInterval = setInterval(() => {
           refreshWallet();
           fetchTransactions();
-        }, 500);
+        }, 1000);
+        
+        // Stop refreshing after 10 seconds
         setTimeout(() => {
-          refreshWallet();
-          fetchTransactions();
-        }, 2000);
+          clearInterval(refreshInterval);
+        }, 10000);
       }
       // Clean up URL params without losing session
       const newUrl = window.location.pathname;
@@ -150,13 +154,17 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
 
       console.log('Initializing payment for user:', user.id, 'amount:', amount);
 
-      // Store session data before payment
-      sessionStorage.setItem('pre_payment_session', JSON.stringify({
+      // Store session data in BOTH sessionStorage AND localStorage for redundancy
+      const sessionBackup = {
         access_token: sessionData.session.access_token,
         refresh_token: sessionData.session.refresh_token,
         user_id: user.id,
-        amount: amount
-      }));
+        amount: amount,
+        timestamp: Date.now()
+      };
+      
+      sessionStorage.setItem('pre_payment_session', JSON.stringify(sessionBackup));
+      localStorage.setItem('pre_payment_session', JSON.stringify(sessionBackup));
 
       const { data, error } = await supabase.functions.invoke('initialize-payment', {
         body: {
@@ -180,7 +188,7 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
       if (data?.authorization_url) {
         console.log('Redirecting to Paystack:', data.authorization_url);
         
-        // Store payment info
+        // Store additional payment info
         sessionStorage.setItem('paystack_payment_data', JSON.stringify({
           reference: data.reference,
           amount: amount,
@@ -188,7 +196,7 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
           timestamp: Date.now()
         }));
 
-        // Redirect to Paystack
+        // Use window.location.href for redirect to maintain session
         window.location.href = data.authorization_url;
       } else {
         throw new Error('No authorization URL received');
@@ -196,6 +204,9 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
     } catch (error) {
       console.error('Payment initialization error:', error);
       toast.error('Failed to initialize payment. Please try again.');
+      // Clean up stored session data on error
+      sessionStorage.removeItem('pre_payment_session');
+      localStorage.removeItem('pre_payment_session');
     } finally {
       setLoading(false);
     }

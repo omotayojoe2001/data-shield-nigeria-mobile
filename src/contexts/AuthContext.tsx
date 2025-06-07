@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -103,28 +102,49 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Restore session from payment redirect
+  // Enhanced session restoration for payment redirects
   const restoreSessionAfterPayment = async () => {
-    const storedSession = sessionStorage.getItem('pre_payment_session');
+    console.log('Checking for stored session after payment...');
+    
+    // Check both sessionStorage and localStorage for session data
+    const sessionStorageSession = sessionStorage.getItem('pre_payment_session');
+    const localStorageSession = localStorage.getItem('pre_payment_session');
+    const storedSession = sessionStorageSession || localStorageSession;
+    
     if (storedSession) {
       try {
         const sessionData = JSON.parse(storedSession);
-        console.log('Restoring session after payment for user:', sessionData.user_id);
+        console.log('Found stored session, attempting to restore for user:', sessionData.user_id);
         
         // Set the session in Supabase
-        await supabase.auth.setSession({
+        const { data, error } = await supabase.auth.setSession({
           access_token: sessionData.access_token,
           refresh_token: sessionData.refresh_token
         });
         
-        // Clean up stored session
-        sessionStorage.removeItem('pre_payment_session');
-        console.log('Session restored successfully after payment');
+        if (error) {
+          console.error('Error restoring session:', error);
+          // Clean up invalid session data
+          sessionStorage.removeItem('pre_payment_session');
+          localStorage.removeItem('pre_payment_session');
+          return false;
+        }
         
-        return true;
+        if (data.session) {
+          console.log('Session restored successfully after payment');
+          setSession(data.session);
+          setUser(data.session.user);
+          
+          // Clean up stored session
+          sessionStorage.removeItem('pre_payment_session');
+          localStorage.removeItem('pre_payment_session');
+          
+          return true;
+        }
       } catch (error) {
-        console.error('Error restoring session after payment:', error);
+        console.error('Error parsing stored session:', error);
         sessionStorage.removeItem('pre_payment_session');
+        localStorage.removeItem('pre_payment_session');
         return false;
       }
     }
@@ -134,23 +154,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const getSession = async () => {
       try {
-        // Check if we need to restore session after payment
-        const wasRestored = await restoreSessionAfterPayment();
+        console.log('Initializing auth state...');
         
-        if (wasRestored) {
-          // Small delay to ensure session is properly set
-          await new Promise(resolve => setTimeout(resolve, 100));
+        // First check if we're returning from a payment
+        const urlParams = new URLSearchParams(window.location.search);
+        const isPaymentReturn = urlParams.get('payment') === 'success';
+        
+        if (isPaymentReturn) {
+          console.log('Detected payment return, attempting session restoration...');
+          const wasRestored = await restoreSessionAfterPayment();
+          
+          if (wasRestored) {
+            // Give some time for session to be properly set
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
         }
 
+        // Get current session
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) {
           console.error('Session error:', error);
         }
         
+        console.log('Current session state:', session ? 'authenticated' : 'not authenticated');
+        
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          console.log('Loading user data for:', session.user.email);
           await Promise.all([
             fetchProfile(session.user.id),
             fetchWallet(session.user.id)

@@ -38,18 +38,19 @@ serve(async (req) => {
         amount,
         reference,
         status,
-        type
+        type,
+        customerEmail: customer?.email
       });
 
       if (!userId) {
-        console.log("No user ID in metadata, skipping");
+        console.log("No user ID in metadata, skipping wallet update");
         return new Response(JSON.stringify({ received: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
         });
       }
 
-      // Check if transaction already processed
+      // Check if transaction already processed to prevent duplicates
       const { data: existingTransaction } = await supabase
         .from('transactions')
         .select('id')
@@ -59,7 +60,7 @@ serve(async (req) => {
 
       if (existingTransaction) {
         console.log("Transaction already processed for reference:", reference);
-        return new Response(JSON.stringify({ received: true }), {
+        return new Response(JSON.stringify({ received: true, message: "Already processed" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
         });
@@ -72,15 +73,29 @@ serve(async (req) => {
         .eq('user_id', userId)
         .single();
 
-      if (walletError || !wallet) {
+      if (walletError) {
         console.error("Error fetching wallet:", walletError);
-        throw new Error("Wallet not found");
+        // Try to create wallet if it doesn't exist
+        const { data: newWallet, error: createError } = await supabase
+          .from('wallet')
+          .insert({ user_id: userId, balance: 0 })
+          .select('balance')
+          .single();
+        
+        if (createError) {
+          console.error("Error creating wallet:", createError);
+          throw new Error("Failed to create or fetch wallet");
+        }
+        
+        wallet = newWallet;
+        console.log("Created new wallet for user:", userId);
       }
 
-      const currentBalance = wallet.balance || 0;
+      const currentBalance = wallet?.balance || 0;
       const newBalance = currentBalance + amount;
 
       console.log("Updating wallet balance:", {
+        userId,
         currentBalance,
         amountToAdd: amount,
         newBalance
@@ -120,30 +135,50 @@ serve(async (req) => {
 
       console.log("Transaction recorded successfully");
 
-      // Send wallet update event
+      // Send real-time wallet update notification
       try {
-        await supabase
-          .channel(`wallet-updates-${userId}`)
-          .send({
-            type: 'broadcast',
-            event: 'wallet_updated',
-            payload: { balance: newBalance, amount: amount }
-          });
-        console.log("Wallet update event sent");
+        const channel = supabase.channel(`wallet-updates-${userId}`);
+        await channel.send({
+          type: 'broadcast',
+          event: 'wallet_updated',
+          payload: { 
+            balance: newBalance, 
+            amount: amount,
+            reference: reference,
+            timestamp: new Date().toISOString()
+          }
+        });
+        console.log("Real-time wallet update event sent for user:", userId);
       } catch (eventError) {
-        console.log("Failed to send wallet update event:", eventError);
+        console.error("Failed to send wallet update event:", eventError);
+        // Don't fail the webhook for this
       }
 
-      console.log("Payment processed successfully for reference:", reference);
+      console.log("Payment processed successfully for reference:", reference, "User:", userId);
+      
+      return new Response(JSON.stringify({ 
+        received: true, 
+        processed: true,
+        reference: reference,
+        user_id: userId,
+        amount: amount
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
     }
 
+    console.log("Event not processed (not charge.success):", event.event);
     return new Response(JSON.stringify({ received: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error) {
     console.error("Webhook error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      received: true 
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
     });
