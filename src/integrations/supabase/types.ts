@@ -12,21 +12,27 @@ export type Database = {
       daily_bonus_claims: {
         Row: {
           created_at: string
+          days_claimed: number
           id: string
+          is_eligible: boolean
           last_claimed_at: string
           next_claim_at: string
           user_id: string | null
         }
         Insert: {
           created_at?: string
+          days_claimed?: number
           id?: string
+          is_eligible?: boolean
           last_claimed_at?: string
           next_claim_at?: string
           user_id?: string | null
         }
         Update: {
           created_at?: string
+          days_claimed?: number
           id?: string
+          is_eligible?: boolean
           last_claimed_at?: string
           next_claim_at?: string
           user_id?: string | null
