@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { Gift, Calendar, Database } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Gift, Clock, CheckCircle } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
-import { bonusService } from '../services/bonusService';
+import { bonusService } from '@/services/bonusService';
 import { toast } from 'sonner';
 
 interface DailyBonusSectionProps {
@@ -11,50 +10,52 @@ interface DailyBonusSectionProps {
 }
 
 const DailyBonusSection = ({ compact = false }: DailyBonusSectionProps) => {
-  const [claiming, setClaiming] = useState(false);
-  const [bonusStatus, setBonusStatus] = useState<any>(null);
-  const [remainingDays, setRemainingDays] = useState(0);
-  const { user } = useAuth();
   const { theme } = useTheme();
+  const [bonusInfo, setBonusInfo] = useState({
+    daysRemaining: 0,
+    daysClaimed: 0,
+    canClaim: false,
+    nextClaimTime: undefined as Date | undefined
+  });
+  const [claiming, setClaiming] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      loadBonusStatus();
-    }
-  }, [user]);
+    loadBonusInfo();
+  }, []);
 
   useEffect(() => {
     // Listen for bonus updates
     const handleBonusUpdate = () => {
-      loadBonusStatus();
+      loadBonusInfo();
     };
 
     window.addEventListener('bonus-updated', handleBonusUpdate);
+    window.addEventListener('plan-updated', handleBonusUpdate);
+
     return () => {
       window.removeEventListener('bonus-updated', handleBonusUpdate);
+      window.removeEventListener('plan-updated', handleBonusUpdate);
     };
   }, []);
 
-  const loadBonusStatus = async () => {
+  const loadBonusInfo = async () => {
     try {
-      const status = await bonusService.getBonusClaimStatus();
-      const remaining = await bonusService.getRemainingBonusDays();
-      setBonusStatus(status);
-      setRemainingDays(remaining);
+      const info = await bonusService.getBonusInfo();
+      setBonusInfo(info);
     } catch (error) {
-      console.error('Error loading bonus status:', error);
+      console.error('Error loading bonus info:', error);
     }
   };
 
-  const handleClaimBonus = async () => {
-    if (claiming || !user) return;
+  const handleClaim = async () => {
+    if (claiming || !bonusInfo.canClaim) return;
 
     setClaiming(true);
     try {
       const result = await bonusService.claimDailyBonus();
       if (result.success) {
         toast.success(result.message);
-        await loadBonusStatus();
+        await loadBonusInfo();
       } else {
         toast.error(result.message);
       }
@@ -66,110 +67,141 @@ const DailyBonusSection = ({ compact = false }: DailyBonusSectionProps) => {
     }
   };
 
-  const canClaim = bonusStatus && bonusStatus.is_eligible && bonusStatus.days_claimed < 7 && 
-                  new Date() >= new Date(bonusStatus.next_claim_at);
+  const getTimeUntilNextClaim = () => {
+    if (!bonusInfo.nextClaimTime) return '';
+    
+    const now = new Date();
+    const diff = bonusInfo.nextClaimTime.getTime() - now.getTime();
+    if (diff <= 0) return '';
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  };
 
-  const isEligible = bonusStatus && bonusStatus.is_eligible && bonusStatus.days_claimed < 7;
-
-  if (!bonusStatus || !isEligible) {
-    return null; // Don't show anything if user is not eligible
+  // Don't show if bonus period is over
+  if (bonusInfo.daysRemaining === 0 && bonusInfo.daysClaimed >= 7) {
+    return null;
   }
 
   if (compact) {
     return (
-      <div className={`rounded-2xl p-4 shadow-lg border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-purple-100'}`}>
+      <div className={`rounded-2xl p-4 shadow-lg border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-              <Database size={20} className="text-white" />
+            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+              <Gift size={20} className="text-white" />
             </div>
             <div>
-              <h4 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-purple-900'}`}>Free 200MB</h4>
-              <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-purple-600'}`}>
-                {remainingDays} days left
+              <h4 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
+                Daily Bonus
+              </h4>
+              <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
+                {bonusInfo.daysRemaining > 0 ? `${bonusInfo.daysRemaining} days left` : 'Completed'}
               </p>
             </div>
           </div>
-          <button
-            onClick={handleClaimBonus}
-            disabled={!canClaim || claiming}
-            className={`px-4 py-2 rounded-xl font-medium transition-all duration-300 ${
-              canClaim
-                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            {claiming ? 'Claiming...' : canClaim ? 'Claim' : 'Claimed'}
-          </button>
+          
+          {bonusInfo.canClaim ? (
+            <button
+              onClick={handleClaim}
+              disabled={claiming}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50"
+            >
+              {claiming ? 'Claiming...' : 'Claim 200MB'}
+            </button>
+          ) : (
+            <div className="text-center">
+              <div className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-blue-500'}`}>
+                {bonusInfo.daysRemaining > 0 ? (
+                  <>Next in {getTimeUntilNextClaim()}</>
+                ) : (
+                  'Bonus Complete'
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`rounded-3xl p-6 shadow-xl border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-purple-100'}`}>
-      <div className="text-center mb-6">
-        <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-3xl flex items-center justify-center mx-auto mb-4">
-          <Database size={40} className="text-white" />
+    <div className={`rounded-3xl p-6 shadow-xl border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
+      <div className="flex items-center space-x-3 mb-4">
+        <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+          <Gift size={24} className="text-white" />
         </div>
-        <h3 className={`text-2xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-purple-900'}`}>Free 200MB Daily</h3>
-        <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-purple-600'}`}>For new users - 7 days only</p>
-      </div>
-
-      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 mb-6">
-        <div className="grid grid-cols-2 gap-4 text-center">
-          <div>
-            <div className="text-3xl font-bold text-purple-600">200MB</div>
-            <div className="text-sm text-purple-700">Per Day</div>
-          </div>
-          <div>
-            <div className="text-3xl font-bold text-pink-600">{remainingDays}</div>
-            <div className="text-sm text-pink-700">Days Left</div>
-          </div>
+        <div>
+          <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
+            7-Day Welcome Bonus
+          </h3>
+          <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
+            Claim 200MB free data daily for new users
+          </p>
         </div>
       </div>
 
-      <div className="space-y-3 mb-6">
-        <div className="flex items-center space-x-3">
-          <Calendar size={20} className="text-purple-500" />
-          <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-purple-700'}`}>
-            Day {bonusStatus.days_claimed + 1} of 7
+      {/* Progress indicator */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>
+            Progress: Day {bonusInfo.daysClaimed}/7
+          </span>
+          <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-blue-500'}`}>
+            {bonusInfo.daysRemaining} days remaining
           </span>
         </div>
-        <div className="flex items-center space-x-3">
-          <Gift size={20} className="text-pink-500" />
-          <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-purple-700'}`}>
-            Claim once per day
-          </span>
+        <div className={`w-full h-2 rounded-full ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-100'}`}>
+          <div 
+            className="h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-300"
+            style={{ width: `${(bonusInfo.daysClaimed / 7) * 100}%` }}
+          />
         </div>
       </div>
 
-      <button
-        onClick={handleClaimBonus}
-        disabled={!canClaim || claiming}
-        className={`w-full py-4 rounded-2xl font-semibold text-lg transition-all duration-300 ${
-          canClaim
-            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-xl'
-            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-        }`}
-      >
-        {claiming ? (
-          <div className="flex items-center justify-center space-x-2">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-            <span>Claiming...</span>
+      {/* Claim button or status */}
+      <div className="text-center">
+        {bonusInfo.canClaim ? (
+          <button
+            onClick={handleClaim}
+            disabled={claiming}
+            className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl font-semibold text-lg hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {claiming ? (
+              <div className="flex items-center justify-center space-x-2">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <span>Claiming...</span>
+              </div>
+            ) : (
+              <>🎁 Claim Today's 200MB</>
+            )}
+          </button>
+        ) : bonusInfo.daysRemaining > 0 ? (
+          <div className={`p-4 rounded-2xl ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'} flex items-center justify-center space-x-2`}>
+            <Clock size={20} className={theme === 'dark' ? 'text-gray-300' : 'text-blue-600'} />
+            <span className={`font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>
+              Next bonus available in {getTimeUntilNextClaim()}
+            </span>
           </div>
-        ) : canClaim ? (
-          'Claim 200MB Now'
         ) : (
-          bonusStatus.days_claimed >= 7 ? 'All Bonuses Claimed' : 'Already Claimed Today'
+          <div className={`p-4 rounded-2xl ${theme === 'dark' ? 'bg-gray-700' : 'bg-green-50'} flex items-center justify-center space-x-2`}>
+            <CheckCircle size={20} className="text-green-600" />
+            <span className={`font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-green-700'}`}>
+              7-day bonus period completed! 🎉
+            </span>
+          </div>
         )}
-      </button>
+      </div>
 
-      {bonusStatus.days_claimed >= 7 && (
-        <div className={`mt-4 text-center ${theme === 'dark' ? 'text-gray-300' : 'text-purple-600'}`}>
-          <p className="text-sm">You've used all your free bonuses! Upgrade to continue enjoying our service.</p>
-        </div>
-      )}
+      {/* Info text */}
+      <p className={`text-xs text-center mt-3 ${theme === 'dark' ? 'text-gray-400' : 'text-blue-500'}`}>
+        * Only available for new users during their first 7 days
+      </p>
     </div>
   );
 };

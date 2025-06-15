@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { bonusService } from './bonusService';
 
 export interface UserPlan {
   id: string;
@@ -11,14 +12,6 @@ export interface UserPlan {
   daily_reset_at?: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface DailyBonusClaim {
-  id: string;
-  user_id: string;
-  last_claimed_at: string;
-  next_claim_at: string;
-  created_at: string;
 }
 
 class PlanService {
@@ -238,123 +231,12 @@ class PlanService {
     }
   }
 
-  async getBonusClaimStatus(): Promise<DailyBonusClaim | null> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-
-      const { data, error } = await supabase
-        .from('daily_bonus_claims')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      // If no bonus record exists, create one that's immediately claimable
-      if (!data) {
-        const now = new Date();
-        const { data: newRecord, error: insertError } = await supabase
-          .from('daily_bonus_claims')
-          .insert({
-            user_id: user.id,
-            last_claimed_at: new Date(0).toISOString(), // Epoch time
-            next_claim_at: now.toISOString() // Available immediately
-          })
-          .select()
-          .single();
-
-        if (insertError) throw insertError;
-        return newRecord;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error fetching bonus claim status:', error);
-      return null;
-    }
+  async getBonusClaimStatus() {
+    return await bonusService.getBonusClaimStatus();
   }
 
   async claimDailyBonus(): Promise<{ success: boolean; message: string }> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return { success: false, message: 'User not authenticated' };
-
-      const bonusStatus = await this.getBonusClaimStatus();
-      if (!bonusStatus) {
-        return { success: false, message: 'Bonus claim record not found' };
-      }
-
-      const now = new Date();
-      const nextClaimTime = new Date(bonusStatus.next_claim_at);
-
-      console.log('Bonus claim check:', {
-        now: now.toISOString(),
-        nextClaimTime: nextClaimTime.toISOString(),
-        canClaim: now >= nextClaimTime
-      });
-
-      if (now < nextClaimTime) {
-        const hoursLeft = Math.ceil((nextClaimTime.getTime() - now.getTime()) / (1000 * 60 * 60));
-        return { success: false, message: `Next bonus available in ${hoursLeft}h` };
-      }
-
-      // Update bonus claim record FIRST to prevent double claims
-      const nextClaim = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      const { error: bonusUpdateError } = await supabase
-        .from('daily_bonus_claims')
-        .update({
-          last_claimed_at: now.toISOString(),
-          next_claim_at: nextClaim.toISOString()
-        })
-        .eq('user_id', user.id);
-
-      if (bonusUpdateError) throw bonusUpdateError;
-
-      // Add bonus to wallet
-      const bonusAmount = 5000; // ₦50 in kobo
-      const { data: wallet, error: walletError } = await supabase
-        .from('wallet')
-        .select('balance')
-        .eq('user_id', user.id)
-        .single();
-
-      if (walletError) throw walletError;
-
-      if (wallet) {
-        const { error: updateWalletError } = await supabase
-          .from('wallet')
-          .update({ 
-            balance: wallet.balance + bonusAmount,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id);
-
-        if (updateWalletError) throw updateWalletError;
-
-        // Record transaction
-        await supabase
-          .from('transactions')
-          .insert({
-            user_id: user.id,
-            type: 'bonus',
-            amount: bonusAmount,
-            description: 'Daily bonus claimed',
-            status: 'completed'
-          });
-
-        // Trigger UI updates
-        window.dispatchEvent(new CustomEvent('wallet-updated'));
-        window.dispatchEvent(new CustomEvent('plan-updated'));
-      }
-
-      return { success: true, message: 'Daily bonus claimed successfully!' };
-    } catch (error) {
-      console.error('Error claiming daily bonus:', error);
-      return { success: false, message: 'Failed to claim bonus' };
-    }
+    return await bonusService.claimDailyBonus();
   }
 
   async resetDailyFreeData(): Promise<void> {
