@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
-import { Shield, Zap, Wallet, CheckCircle, ArrowRight, Database } from 'lucide-react';
+import { Shield, Zap, Wallet, CheckCircle, ArrowRight, Database, Gift } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { planService, type UserPlan } from '../services/planService';
+import { bonusService } from '../services/bonusService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -12,10 +12,16 @@ interface PlansScreenProps {
 }
 
 const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
-  const [selectedTab, setSelectedTab] = useState<'free' | 'data' | 'payg'>('free');
+  const [selectedTab, setSelectedTab] = useState<'welcome' | 'data' | 'payg'>('welcome');
   const [loading, setLoading] = useState(false);
   const [selectedDataPlan, setSelectedDataPlan] = useState<string | null>(null);
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
+  const [bonusInfo, setBonusInfo] = useState({
+    daysRemaining: 0,
+    daysClaimed: 0,
+    canClaim: false,
+    nextClaimTime: undefined as Date | undefined
+  });
   const { user, wallet, refreshWallet } = useAuth();
   const { theme } = useTheme();
 
@@ -29,6 +35,7 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
   useEffect(() => {
     if (user) {
       loadCurrentPlan();
+      loadBonusInfo();
     }
   }, [user]);
 
@@ -36,11 +43,14 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
     // Listen for plan updates
     const handlePlanUpdate = () => {
       loadCurrentPlan();
+      loadBonusInfo();
     };
 
     window.addEventListener('plan-updated', handlePlanUpdate);
+    window.addEventListener('bonus-updated', handlePlanUpdate);
     return () => {
       window.removeEventListener('plan-updated', handlePlanUpdate);
+      window.removeEventListener('bonus-updated', handlePlanUpdate);
     };
   }, []);
 
@@ -48,12 +58,64 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
     try {
       const plan = await planService.getCurrentPlan();
       setCurrentPlan(plan);
+      
+      // Set default tab based on current plan or eligibility
+      if (!plan) {
+        const bonusStatus = await bonusService.getBonusClaimStatus();
+        if (bonusStatus && bonusStatus.is_eligible && bonusStatus.days_claimed < 7) {
+          setSelectedTab('welcome');
+        } else {
+          setSelectedTab('payg');
+        }
+      }
     } catch (error) {
       console.error('Error loading current plan:', error);
     }
   };
 
-  const handlePlanSwitch = async (planType: 'free' | 'payg') => {
+  const loadBonusInfo = async () => {
+    try {
+      const info = await bonusService.getBonusInfo();
+      setBonusInfo({
+        daysRemaining: info.daysRemaining,
+        daysClaimed: info.daysClaimed,
+        canClaim: info.canClaim,
+        nextClaimTime: info.nextClaimTime
+      });
+    } catch (error) {
+      console.error('Error loading bonus info:', error);
+    }
+  };
+
+  const handleActivateWelcomeBonus = async () => {
+    if (!user || loading) return;
+
+    setLoading(true);
+    try {
+      const bonusStatus = await bonusService.getBonusClaimStatus();
+      if (!bonusStatus || !bonusStatus.is_eligible || bonusStatus.days_claimed >= 7) {
+        toast.error('Welcome bonus is not available for your account');
+        return;
+      }
+
+      // Create welcome bonus plan if not exists
+      const success = await planService.switchPlan('welcome_bonus' as any);
+      if (success) {
+        toast.success('Welcome bonus activated! Start claiming your daily 200MB bonus.');
+        await loadCurrentPlan();
+        onTabChange('home');
+      } else {
+        toast.error('Failed to activate welcome bonus');
+      }
+    } catch (error) {
+      console.error('Error activating welcome bonus:', error);
+      toast.error('Failed to activate welcome bonus');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePlanSwitch = async (planType: 'payg' | 'data') => {
     if (!user) {
       toast.error('Please login to switch plans');
       return;
@@ -65,45 +127,16 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
     try {
       const success = await planService.switchPlan(planType);
       if (success) {
-        toast.success(`Successfully switched to ${planType === 'payg' ? 'Pay-As-You-Go' : 'Free Plan'}`);
-        // Trigger real-time updates
+        toast.success(`Successfully switched to ${planType === 'payg' ? 'Pay-As-You-Go' : 'Data Plan'}`);
         window.dispatchEvent(new CustomEvent('plan-updated'));
         await loadCurrentPlan();
+        onTabChange('home');
       } else {
         toast.error('Failed to switch plan');
       }
     } catch (error) {
       console.error('Error switching plan:', error);
       toast.error('Failed to switch plan');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSwitchToDataPlan = async () => {
-    if (!user) {
-      toast.error('Please login to switch to data plan');
-      return;
-    }
-
-    if (loading) return;
-
-    setLoading(true);
-    try {
-      // Switch to data plan (this will preserve existing data if any)
-      const success = await planService.switchPlan('data');
-      if (success) {
-        toast.success('Successfully switched to Data Plan');
-        
-        // Trigger real-time updates
-        window.dispatchEvent(new CustomEvent('plan-updated'));
-        await loadCurrentPlan();
-      } else {
-        toast.error('Failed to switch to data plan');
-      }
-    } catch (error) {
-      console.error('Error switching to data plan:', error);
-      toast.error('Failed to switch to data plan');
     } finally {
       setLoading(false);
     }
@@ -157,6 +190,9 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
     }
   };
 
+  // Check if user is eligible for welcome bonus
+  const isWelcomeBonusEligible = bonusInfo.daysRemaining > 0 || bonusInfo.daysClaimed < 7;
+
   return (
     <div className={`min-h-screen pb-24 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-white'}`}>
       {/* Header */}
@@ -169,17 +205,19 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
       <div className="px-6 mt-6">
         <div className={`rounded-2xl p-2 shadow-lg border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
           <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => setSelectedTab('free')}
-              className={`py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
-                selectedTab === 'free'
-                  ? 'bg-blue-900 text-white shadow-lg'
-                  : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-blue-600 hover:bg-blue-50'}`
-              }`}
-            >
-              <Shield size={16} className="inline mr-2" />
-              Free Plan
-            </button>
+            {isWelcomeBonusEligible && (
+              <button
+                onClick={() => setSelectedTab('welcome')}
+                className={`py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
+                  selectedTab === 'welcome'
+                    ? 'bg-purple-600 text-white shadow-lg'
+                    : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-blue-600 hover:bg-blue-50'}`
+                }`}
+              >
+                <Gift size={16} className="inline mr-2" />
+                Welcome Bonus
+              </button>
+            )}
             <button
               onClick={() => setSelectedTab('data')}
               className={`py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
@@ -187,7 +225,7 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
                   ? 'bg-blue-900 text-white shadow-lg'
                   : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-blue-600 hover:bg-blue-50'}`
               }`}
-            >
+              >
               <Zap size={16} className="inline mr-2" />
               Buy Data
             </button>
@@ -206,30 +244,30 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
         </div>
       </div>
 
-      {/* Free Plan */}
-      {selectedTab === 'free' && (
+      {/* Welcome Bonus */}
+      {selectedTab === 'welcome' && isWelcomeBonusEligible && (
         <div className="px-6 mt-6">
           <div className={`rounded-3xl p-6 shadow-xl border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
             <div className="text-center mb-6">
-              <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-4">
-                <Shield size={40} className="text-white" />
+              <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-600 rounded-3xl flex items-center justify-center mx-auto mb-4">
+                <Gift size={40} className="text-white" />
               </div>
-              <h3 className={`text-2xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Free Plan</h3>
-              <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>100MB daily allowance</p>
+              <h3 className={`text-2xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>7-Day Welcome Bonus</h3>
+              <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>Get 200MB free data daily for 7 days</p>
             </div>
 
-            <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-2xl p-6 mb-6">
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 mb-6">
               <div className="text-center">
-                <div className="text-4xl font-bold text-purple-600 mb-2">100MB</div>
-                <div className="text-lg text-purple-700 font-semibold">per day</div>
-                <div className="text-sm text-purple-600 mt-2">Resets every 24 hours</div>
+                <div className="text-4xl font-bold text-purple-600 mb-2">200MB</div>
+                <div className="text-lg text-purple-700 font-semibold">daily for 7 days</div>
+                <div className="text-sm text-purple-600 mt-2">Total: 1.4GB free data</div>
               </div>
             </div>
 
             <div className="space-y-3 mb-6">
               <div className="flex items-center space-x-3">
                 <CheckCircle size={20} className="text-green-500" />
-                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>100MB daily data allowance</span>
+                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>200MB free data every day</span>
               </div>
               <div className="flex items-center space-x-3">
                 <CheckCircle size={20} className="text-green-500" />
@@ -237,21 +275,25 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
               </div>
               <div className="flex items-center space-x-3">
                 <CheckCircle size={20} className="text-green-500" />
-                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Resets automatically every 24 hours</span>
+                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>7 days to try GoData for free</span>
               </div>
               <div className="flex items-center space-x-3">
                 <CheckCircle size={20} className="text-green-500" />
-                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>No wallet deductions</span>
+                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Available for new users only</span>
               </div>
             </div>
 
             <button 
-              onClick={() => handlePlanSwitch('free')}
-              disabled={loading || currentPlan?.plan_type === 'free'}
-              className="w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl font-semibold text-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
+              onClick={handleActivateWelcomeBonus}
+              disabled={loading || currentPlan?.plan_type === 'welcome_bonus'}
+              className="w-full py-4 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-2xl font-semibold text-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
             >
-              {currentPlan?.plan_type === 'free' ? 'Current Plan' : loading ? 'Switching...' : 'Switch to Free Plan'}
+              {currentPlan?.plan_type === 'welcome_bonus' ? 'Active Plan' : loading ? 'Activating...' : 'Activate Welcome Bonus'}
             </button>
+
+            <p className={`text-xs text-center mt-3 ${theme === 'dark' ? 'text-gray-400' : 'text-purple-500'}`}>
+              * After 7 days, choose between Pay-As-You-Go or Data plans
+            </p>
           </div>
         </div>
       )}
@@ -259,36 +301,6 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
       {/* Buy Data Plans */}
       {selectedTab === 'data' && (
         <div className="px-6 mt-6">
-          {/* Switch to Data Plan Button */}
-          <div className={`rounded-2xl p-4 shadow-lg border mb-4 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <Database size={20} className={`${currentPlan?.plan_type === 'data' ? 'text-green-600' : 'text-gray-400'}`} />
-                <div>
-                  <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
-                    {currentPlan?.plan_type === 'data' ? 'Data Plan Active' : 'Switch to Data Plan'}
-                  </h3>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
-                    {currentPlan?.plan_type === 'data' 
-                      ? `${Math.max(0, currentPlan.data_allocated - currentPlan.data_used)}MB remaining`
-                      : 'Switch to preserve data across plans'
-                    }
-                  </p>
-                </div>
-              </div>
-              {currentPlan?.plan_type !== 'data' && (
-                <button 
-                  onClick={handleSwitchToDataPlan}
-                  disabled={loading}
-                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50"
-                >
-                  <span>{loading ? 'Switching...' : 'Switch'}</span>
-                  <ArrowRight size={16} />
-                </button>
-              )}
-            </div>
-          </div>
-
           <div className="space-y-4">
             {dataPlans.map((plan) => (
               <div key={plan.id} className={`rounded-2xl p-6 shadow-lg border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>

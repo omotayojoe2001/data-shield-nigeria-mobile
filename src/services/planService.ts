@@ -4,7 +4,7 @@ import { bonusService } from './bonusService';
 export interface UserPlan {
   id: string;
   user_id: string;
-  plan_type: 'free' | 'payg' | 'data';
+  plan_type: 'payg' | 'data' | 'welcome_bonus';
   status: 'active' | 'inactive' | 'expired';
   data_allocated: number;
   data_used: number;
@@ -31,11 +31,19 @@ class PlanService {
         throw error;
       }
 
-      // If no active plan found, create and return free plan
+      // If no active plan found, check if user is eligible for welcome bonus
       if (!data) {
-        console.log('No active plan found, creating free plan');
-        await this.createFreePlan(user.id);
-        return await this.getCurrentPlan();
+        console.log('No active plan found, checking welcome bonus eligibility');
+        const bonusStatus = await bonusService.getBonusClaimStatus();
+        
+        if (bonusStatus && bonusStatus.is_eligible && bonusStatus.days_claimed < 7) {
+          // Create welcome bonus plan
+          await this.createWelcomeBonusPlan(user.id);
+          return await this.getCurrentPlan();
+        } else {
+          // No plan and no bonus eligibility - user must choose a plan
+          return null;
+        }
       }
 
       return data as UserPlan;
@@ -45,28 +53,28 @@ class PlanService {
     }
   }
 
-  async createFreePlan(userId: string): Promise<boolean> {
+  async createWelcomeBonusPlan(userId: string): Promise<boolean> {
     try {
       const { error } = await supabase
         .from('user_plans')
         .insert({
           user_id: userId,
-          plan_type: 'free',
+          plan_type: 'welcome_bonus',
           status: 'active',
-          data_allocated: 100,
+          data_allocated: 0, // Data comes from daily bonus claims
           data_used: 0,
-          daily_reset_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
         });
 
       if (error) throw error;
       return true;
     } catch (error) {
-      console.error('Error creating free plan:', error);
+      console.error('Error creating welcome bonus plan:', error);
       return false;
     }
   }
 
-  async switchPlan(newPlanType: 'free' | 'payg' | 'data', dataMB?: number): Promise<boolean> {
+  async switchPlan(newPlanType: 'payg' | 'data', dataMB?: number): Promise<boolean> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
@@ -114,10 +122,7 @@ class PlanService {
         data_used: 0
       };
 
-      if (newPlanType === 'free') {
-        newPlan.data_allocated = 100;
-        newPlan.daily_reset_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      } else if (newPlanType === 'payg') {
+      if (newPlanType === 'payg') {
         newPlan.data_allocated = 0; // Unlimited for PAYG
       } else if (newPlanType === 'data') {
         // Restore previous data plan or use provided data
@@ -239,36 +244,6 @@ class PlanService {
     return await bonusService.claimDailyBonus();
   }
 
-  async resetDailyFreeData(): Promise<void> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const currentPlan = await this.getCurrentPlan();
-      if (!currentPlan || currentPlan.plan_type !== 'free') return;
-
-      const now = new Date();
-      const resetTime = new Date(currentPlan.daily_reset_at || now);
-
-      if (now >= resetTime) {
-        // Reset data usage and set new reset time
-        await supabase
-          .from('user_plans')
-          .update({
-            data_used: 0,
-            daily_reset_at: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
-            updated_at: now.toISOString()
-          })
-          .eq('id', currentPlan.id);
-
-        console.log('Daily free data reset completed');
-        window.dispatchEvent(new CustomEvent('plan-updated'));
-      }
-    } catch (error) {
-      console.error('Error resetting daily free data:', error);
-    }
-  }
-
   async updateDataUsage(usageMB: number): Promise<boolean> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -279,28 +254,22 @@ class PlanService {
 
       console.log(`Updating data usage: ${usageMB}MB for ${currentPlan.plan_type} plan`);
 
-      // For free plan, check daily reset first
-      if (currentPlan.plan_type === 'free') {
-        await this.resetDailyFreeData();
-        // Refetch plan after potential reset
-        const updatedPlan = await this.getCurrentPlan();
-        if (updatedPlan) {
-          const newUsage = updatedPlan.data_used + usageMB;
-          
-          // Apply the usage update
-          console.log(`Free plan: ${updatedPlan.data_used}MB -> ${newUsage}MB (allocated: ${updatedPlan.data_allocated}MB)`);
-          
-          await supabase
-            .from('user_plans')
-            .update({
-              data_used: newUsage,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', updatedPlan.id);
+      // For welcome bonus plan, data usage is tracked but data comes from bonus claims
+      if (currentPlan.plan_type === 'welcome_bonus') {
+        const newUsage = currentPlan.data_used + usageMB;
+        
+        console.log(`Welcome bonus plan: ${currentPlan.data_used}MB -> ${newUsage}MB (allocated: ${currentPlan.data_allocated}MB)`);
+        
+        await supabase
+          .from('user_plans')
+          .update({
+            data_used: newUsage,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentPlan.id);
 
-          // Trigger UI updates
-          window.dispatchEvent(new CustomEvent('plan-updated'));
-        }
+        // Trigger UI updates
+        window.dispatchEvent(new CustomEvent('plan-updated'));
       } else {
         // For data and payg plans
         const newUsage = currentPlan.data_used + usageMB;

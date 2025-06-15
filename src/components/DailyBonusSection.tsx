@@ -41,7 +41,12 @@ const DailyBonusSection = ({ compact = false }: DailyBonusSectionProps) => {
   const loadBonusInfo = async () => {
     try {
       const info = await bonusService.getBonusInfo();
-      setBonusInfo(info);
+      setBonusInfo({
+        daysRemaining: info.daysRemaining,
+        daysClaimed: info.daysClaimed,
+        canClaim: info.canClaim,
+        nextClaimTime: info.nextClaimTime
+      });
     } catch (error) {
       console.error('Error loading bonus info:', error);
     }

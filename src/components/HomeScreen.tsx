@@ -74,14 +74,16 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         // Check if user can connect based on their plan
         const plan = await planService.getCurrentPlan();
         if (!plan) {
-          toast.error('Unable to load plan information. Please try again.');
+          toast.error('No active plan found! Please choose a plan or claim your welcome bonus.');
+          onTabChange('plans');
           return;
         }
         
-        if (plan.plan_type === 'free') {
+        if (plan.plan_type === 'welcome_bonus') {
           const remainingData = Math.max(0, plan.data_allocated - plan.data_used);
           if (remainingData <= 0) {
-            toast.error('Daily free data exhausted! Please upgrade your plan.');
+            toast.error('Welcome bonus data exhausted! Please choose a plan to continue.');
+            onTabChange('plans');
             return;
           }
         }
@@ -114,16 +116,16 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   };
 
   const getPlanDisplayInfo = () => {
-    if (!currentPlan) return { name: 'Free Plan', details: '100MB daily allowance' };
+    if (!currentPlan) return { name: 'No Plan', details: 'Choose a plan to get started' };
     
     switch (currentPlan.plan_type) {
-      case 'free':
+      case 'welcome_bonus':
         const remaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
-        const resetTime = currentPlan.daily_reset_at ? new Date(currentPlan.daily_reset_at) : new Date();
-        const hoursLeft = Math.max(0, Math.ceil((resetTime.getTime() - new Date().getTime()) / (1000 * 60 * 60)));
+        const expiryDate = currentPlan.expires_at ? new Date(currentPlan.expires_at) : null;
+        const daysLeft = expiryDate ? Math.max(0, Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
         return { 
-          name: 'Free Plan', 
-          details: `${remaining}MB remaining (resets in ${hoursLeft}h)` 
+          name: 'Welcome Bonus', 
+          details: `${remaining}MB remaining (${daysLeft} days left)` 
         };
       case 'payg':
         return { 
@@ -133,14 +135,14 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
       case 'data':
         const dataRemaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
         const dataRemainingDisplay = dataRemaining >= 1000 ? `${(dataRemaining / 1000).toFixed(1)}GB` : `${dataRemaining}MB`;
-        const expiryDate = currentPlan.expires_at ? new Date(currentPlan.expires_at) : null;
-        const daysLeft = expiryDate ? Math.max(0, Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
+        const dataExpiryDate = currentPlan.expires_at ? new Date(currentPlan.expires_at) : null;
+        const dataDaysLeft = dataExpiryDate ? Math.max(0, Math.ceil((dataExpiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
         return { 
           name: 'Data Plan', 
-          details: `${dataRemainingDisplay} remaining (${daysLeft} days left)` 
+          details: `${dataRemainingDisplay} remaining (${dataDaysLeft} days left)` 
         };
       default:
-        return { name: 'Free Plan', details: '100MB daily allowance' };
+        return { name: 'No Plan', details: 'Choose a plan to get started' };
     }
   };
 
@@ -224,16 +226,41 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
               onClick={() => onTabChange('plans')}
               className="px-4 py-2 bg-white/20 rounded-xl text-white text-sm font-medium hover:bg-white/30 transition-all duration-300"
             >
-              View All Plans
+              {!currentPlan ? 'Choose Plan' : 'View All Plans'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Daily Bonus */}
-      <div className="px-6 mt-6">
-        <DailyBonusSection />
-      </div>
+      {/* Daily Bonus - only show for welcome bonus users */}
+      {currentPlan?.plan_type === 'welcome_bonus' && (
+        <div className="px-6 mt-6">
+          <DailyBonusSection />
+        </div>
+      )}
+
+      {/* No Plan Warning */}
+      {!currentPlan && (
+        <div className="px-6 mt-6">
+          <div className={`rounded-2xl p-6 shadow-lg border-2 border-orange-500 ${theme === 'dark' ? 'bg-gray-800' : 'bg-orange-50'}`}>
+            <div className="text-center">
+              <div className="text-4xl mb-3">⚠️</div>
+              <h3 className={`text-lg font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-orange-900'}`}>
+                No Active Plan
+              </h3>
+              <p className={`mb-4 ${theme === 'dark' ? 'text-gray-300' : 'text-orange-700'}`}>
+                You need to choose a plan to start using GoData. New users get a 7-day welcome bonus!
+              </p>
+              <button 
+                onClick={() => onTabChange('plans')}
+                className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition-all duration-300"
+              >
+                Choose Your Plan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="px-6 mt-6">
