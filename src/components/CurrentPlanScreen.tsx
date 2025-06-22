@@ -48,7 +48,7 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
 
   const getPlanIcon = (planType: string) => {
     switch (planType) {
-      case 'free':
+      case 'welcome_bonus':
         return <Shield size={32} className="text-purple-600" />;
       case 'payg':
         return <Wallet size={32} className="text-green-600" />;
@@ -61,34 +61,34 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
 
   const getPlanName = (planType: string) => {
     switch (planType) {
-      case 'free':
-        return 'Free Plan';
+      case 'welcome_bonus':
+        return 'Welcome Bonus';
       case 'payg':
         return 'Pay-As-You-Go';
       case 'data':
         return 'Data Plan';
       default:
-        return 'Free Plan';
+        return 'Welcome Bonus';
     }
   };
 
   const getPlanDescription = (plan: UserPlan) => {
     switch (plan.plan_type) {
-      case 'free':
+      case 'welcome_bonus':
         const remaining = Math.max(0, plan.data_allocated - plan.data_used);
-        const resetTime = plan.daily_reset_at ? new Date(plan.daily_reset_at) : new Date();
-        const hoursLeft = Math.max(0, Math.ceil((resetTime.getTime() - new Date().getTime()) / (1000 * 60 * 60)));
-        return `${remaining}MB remaining today (resets in ${hoursLeft}h)`;
+        const expiryDate = plan.expires_at ? new Date(plan.expires_at) : null;
+        const daysLeft = expiryDate ? Math.max(0, Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
+        return `${remaining}MB remaining (${daysLeft} days left)`;
       case 'payg':
         return `₦${((wallet?.balance || 0) / 100).toFixed(2)} wallet balance`;
       case 'data':
         const dataRemaining = Math.max(0, plan.data_allocated - plan.data_used);
         const dataRemainingDisplay = dataRemaining >= 1000 ? `${(dataRemaining / 1000).toFixed(1)}GB` : `${dataRemaining}MB`;
-        const expiryDate = plan.expires_at ? new Date(plan.expires_at) : null;
-        const daysLeft = expiryDate ? Math.max(0, Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
-        return `${dataRemainingDisplay} remaining (${daysLeft} days left)`;
+        const dataExpiryDate = plan.expires_at ? new Date(plan.expires_at) : null;
+        const dataDaysLeft = dataExpiryDate ? Math.max(0, Math.ceil((dataExpiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
+        return `${dataRemainingDisplay} remaining (${dataDaysLeft} days left)`;
       default:
-        return 'Basic plan with daily data allowance';
+        return 'Basic plan with welcome bonus';
     }
   };
 
@@ -142,7 +142,7 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
         <div className={`rounded-3xl p-6 shadow-xl border mb-6 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
           <div className="flex items-center space-x-4 mb-6">
             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
-              currentPlan.plan_type === 'free' ? 'bg-purple-100' :
+              currentPlan.plan_type === 'welcome_bonus' ? 'bg-purple-100' :
               currentPlan.plan_type === 'payg' ? 'bg-green-100' :
               'bg-blue-100'
             }`}>
@@ -198,15 +198,13 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
               <div className="flex items-center space-x-2 mb-2">
                 <Clock size={16} className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`} />
                 <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>
-                  {currentPlan.plan_type === 'free' ? 'Resets' : 'Expires'}
+                  {currentPlan.plan_type === 'welcome_bonus' ? 'Expires' : 'Expires'}
                 </span>
               </div>
               <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
-                {currentPlan.plan_type === 'free' 
-                  ? new Date(currentPlan.daily_reset_at || '').toLocaleDateString()
-                  : currentPlan.expires_at 
-                    ? new Date(currentPlan.expires_at).toLocaleDateString()
-                    : 'Never'
+                {currentPlan.expires_at 
+                  ? new Date(currentPlan.expires_at).toLocaleDateString()
+                  : 'Never'
                 }
               </p>
             </div>
@@ -218,10 +216,10 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
               onClick={() => onTabChange('plans')}
               className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
             >
-              Upgrade Plan
+              {currentPlan.plan_type === 'welcome_bonus' ? 'Choose Plan After Bonus' : 'Upgrade Plan'}
             </button>
             
-            {currentPlan.plan_type !== 'free' && (
+            {currentPlan.plan_type !== 'welcome_bonus' && (
               <button
                 onClick={() => onTabChange('usage')}
                 className={`w-full py-3 rounded-xl font-semibold transition-all duration-300 ${
@@ -241,19 +239,19 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
           <h3 className={`text-xl font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Plan Features</h3>
           
           <div className="space-y-3">
-            {currentPlan.plan_type === 'free' && (
+            {currentPlan.plan_type === 'welcome_bonus' && (
               <>
                 <div className="flex items-center justify-between">
-                  <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Daily data allowance</span>
-                  <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>100MB</span>
+                  <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Welcome bonus period</span>
+                  <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>7 days</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Daily bonus claim</span>
+                  <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>200MB</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Data compression</span>
                   <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Up to 70%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Auto reset</span>
-                  <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Every 24 hours</span>
                 </div>
               </>
             )}

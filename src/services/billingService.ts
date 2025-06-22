@@ -55,8 +55,8 @@ class BillingService {
         await this.chargePayAsYouGo(user.id, dataMB);
       } else if (currentPlan.plan_type === 'data') {
         await this.deductFromDataPlan(currentPlan, dataMB);
-      } else if (currentPlan.plan_type === 'free') {
-        await this.deductFromFreePlan(currentPlan, dataMB);
+      } else if (currentPlan.plan_type === 'welcome_bonus') {
+        await this.deductFromWelcomeBonus(currentPlan, dataMB);
       }
 
       // Record usage transaction for all plans
@@ -132,20 +132,20 @@ class BillingService {
     }
   }
 
-  private async deductFromFreePlan(plan: any, dataMB: number) {
+  private async deductFromWelcomeBonus(plan: any, dataMB: number) {
     const remainingData = Math.max(0, plan.data_allocated - plan.data_used);
     
     if (remainingData <= 0) {
-      toast.error('Daily free quota exhausted! Upgrade to Pay-As-You-Go or buy data to continue.');
+      toast.error('Welcome bonus data exhausted! Please choose a plan to continue.');
       window.dispatchEvent(new CustomEvent('vpn-force-disconnect'));
       return;
     }
 
-    console.log(`Free plan: ${dataMB.toFixed(2)}MB deducted. Remaining today: ${Math.max(0, remainingData - dataMB).toFixed(0)}MB`);
+    console.log(`Welcome bonus: ${dataMB.toFixed(2)}MB deducted. Remaining: ${Math.max(0, remainingData - dataMB).toFixed(0)}MB`);
 
-    // If daily quota is about to be exhausted, notify user
+    // If welcome bonus is about to be exhausted, notify user
     if (plan.data_used + dataMB >= plan.data_allocated) {
-      toast.warning('Daily free quota almost exhausted! Consider upgrading your plan.');
+      toast.warning('Welcome bonus almost exhausted! Please choose a plan to continue.');
     }
   }
 

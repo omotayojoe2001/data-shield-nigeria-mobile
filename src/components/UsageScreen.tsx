@@ -146,11 +146,11 @@ const UsageScreen = () => {
             <div className={`rounded-xl p-3 mb-4 ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'}`}>
               <div className="text-center">
                 <div className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
-                  {currentPlan.plan_type === 'free' ? 'Free Plan' : 'Data Plan'}
+                  {currentPlan.plan_type === 'welcome_bonus' ? 'Welcome Bonus' : 'Data Plan'}
                 </div>
                 <div className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
-                  {currentPlan.plan_type === 'free' 
-                    ? `${Math.max(0, currentPlan.data_allocated - currentPlan.data_used)}MB remaining today`
+                  {currentPlan.plan_type === 'welcome_bonus' 
+                    ? `${Math.max(0, currentPlan.data_allocated - currentPlan.data_used)}MB remaining (bonus period)`
                     : `${Math.max(0, currentPlan.data_allocated - currentPlan.data_used)}MB remaining`
                   }
                 </div>
