@@ -147,7 +147,7 @@ class BonusService {
         if (updatePlanError) throw updatePlanError;
       }
 
-      // Record transaction
+      // Record transaction for bonus claim
       await supabase
         .from('transactions')
         .insert({
@@ -161,6 +161,7 @@ class BonusService {
       // Trigger UI updates
       window.dispatchEvent(new CustomEvent('plan-updated'));
       window.dispatchEvent(new CustomEvent('bonus-updated'));
+      window.dispatchEvent(new CustomEvent('wallet-updated'));
 
       const daysRemaining = 7 - newDaysClaimed;
       const message = daysRemaining > 0 
@@ -184,9 +185,9 @@ class BonusService {
       const bonusStatus = await this.getBonusClaimStatus();
       if (!bonusStatus) {
         return {
-          daysRemaining: 0,
+          daysRemaining: 7,
           daysClaimed: 0,
-          canClaim: false
+          canClaim: true // New users can claim immediately
         };
       }
 
@@ -201,9 +202,9 @@ class BonusService {
     } catch (error) {
       console.error('Error getting bonus info:', error);
       return {
-        daysRemaining: 0,
+        daysRemaining: 7,
         daysClaimed: 0,
-        canClaim: false
+        canClaim: true
       };
     }
   }

@@ -32,23 +32,13 @@ class PlanService {
         throw error;
       }
 
-      // If no active plan found, check if user is eligible for welcome bonus
+      // If no active plan found, create welcome bonus plan for new users
       if (!data) {
-        console.log('No active plan found, checking welcome bonus eligibility');
+        console.log('No active plan found, creating welcome bonus plan for new user');
         
-        // Check if user already has any plan history to avoid recreating
-        const { data: existingPlans } = await supabase
-          .from('user_plans')
-          .select('id')
-          .eq('user_id', user.id)
-          .limit(1);
-
-        if (!existingPlans || existingPlans.length === 0) {
-          // First time user - create welcome bonus
-          const created = await this.createWelcomeBonusPlan(user.id);
-          if (created) {
-            return await this.getCurrentPlan();
-          }
+        const created = await this.createWelcomeBonusPlan(user.id);
+        if (created) {
+          return await this.getCurrentPlan();
         }
         
         return null;
@@ -65,13 +55,25 @@ class PlanService {
     try {
       console.log('Creating welcome bonus plan for user:', userId);
       
+      // First check if user already has any plan to avoid duplicates
+      const { data: existingPlans } = await supabase
+        .from('user_plans')
+        .select('id')
+        .eq('user_id', userId)
+        .limit(1);
+
+      if (existingPlans && existingPlans.length > 0) {
+        console.log('User already has existing plans, not creating welcome bonus');
+        return false;
+      }
+      
       const { error } = await supabase
         .from('user_plans')
         .insert({
           user_id: userId,
           plan_type: 'welcome_bonus',
           status: 'active',
-          data_allocated: 200, // Start with 200MB for first bonus claim
+          data_allocated: 0, // Start with 0, will be added through bonus claims
           data_used: 0,
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
         });
@@ -173,7 +175,7 @@ class PlanService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return { success: false, message: 'User not authenticated' };
 
-      // Check wallet balance
+      // Check wallet balance (cost should be in kobo)
       const { data: wallet } = await supabase
         .from('wallet')
         .select('balance')
@@ -208,7 +210,7 @@ class PlanService {
         await this.switchPlan('data', newDataAllocated);
       }
 
-      // Deduct from wallet
+      // Deduct from wallet (cost is already in kobo)
       const { error: walletError } = await supabase
         .from('wallet')
         .update({ 
@@ -231,13 +233,13 @@ class PlanService {
         await referralService.processReferralEarning(referral.referrer_id, cost);
       }
 
-      // Record transaction
+      // Record transaction (amount should be negative for deduction, in kobo)
       await supabase
         .from('transactions')
         .insert({
           user_id: user.id,
           type: 'data_purchase',
-          amount: -cost,
+          amount: -cost, // Negative because it's a deduction
           description: `Purchased ${dataMB}MB data plan`,
           status: 'completed'
         });
