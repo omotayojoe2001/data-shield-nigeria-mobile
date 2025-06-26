@@ -20,6 +20,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   const [loading, setLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
   const [activatingBonus, setActivatingBonus] = useState(false);
+  const [bonusClaimStatus, setBonusClaimStatus] = useState<any>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -32,6 +33,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   useEffect(() => {
     if (user) {
       loadPlanData();
+      loadBonusStatus();
     }
   }, [user]);
 
@@ -39,6 +41,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
     // Listen for plan updates
     const handlePlanUpdate = () => {
       loadPlanData();
+      loadBonusStatus();
     };
 
     window.addEventListener('plan-updated', handlePlanUpdate);
@@ -62,6 +65,15 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
     }
   };
 
+  const loadBonusStatus = async () => {
+    try {
+      const status = await planService.getBonusClaimStatus();
+      setBonusClaimStatus(status);
+    } catch (error) {
+      console.error('Error loading bonus status:', error);
+    }
+  };
+
   const handleActivateWelcomeBonus = async () => {
     if (activatingBonus) return;
 
@@ -71,6 +83,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
       if (result.success) {
         toast.success(result.message);
         await loadPlanData();
+        await loadBonusStatus();
       } else {
         toast.error(result.message);
       }
@@ -163,6 +176,9 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   };
 
   const planInfo = getPlanDisplayInfo();
+  
+  // Check if user is eligible for welcome bonus and hasn't completed it
+  const canActivateWelcomeBonus = !currentPlan && bonusClaimStatus && bonusClaimStatus.days_claimed < 7;
 
   return (
     <div className={`min-h-screen pb-20 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-white'}`}>
@@ -174,7 +190,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
             <h1 className="text-white text-xl font-bold leading-tight">
               Hello, {profile?.full_name?.split(' ')[0] || 'User'}! 👋
             </h1>
-            <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>Ready to save on data today?</p>
+            <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>Ready to save on data with GoodDeeds Data?</p>
           </div>
           <div className="text-right">
             <div className="text-white text-xs">Wallet Balance</div>
@@ -183,7 +199,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         </div>
 
         {/* Welcome Bonus Alert - Mobile Optimized */}
-        {!currentPlan && (
+        {canActivateWelcomeBonus && (
           <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-4 mb-4 border border-white/20">
             <div className="text-center">
               <h3 className="text-white font-bold text-base mb-2">🎁 7-Day Welcome Bonus</h3>

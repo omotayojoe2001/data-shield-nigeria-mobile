@@ -5,7 +5,7 @@ import { referralService } from './referralService';
 export interface UserPlan {
   id: string;
   user_id: string;
-  plan_type: 'payg' | 'data' | 'welcome_bonus';
+  plan_type: 'payg' | 'data';
   status: 'active' | 'inactive' | 'expired';
   data_allocated: number;
   data_used: number;
@@ -56,16 +56,16 @@ class PlanService {
         return false;
       }
       
-      // Create welcome bonus plan with proper plan_type
+      // Create data plan for welcome bonus
       const { data: newPlan, error } = await supabase
         .from('user_plans')
         .insert({
           user_id: userId,
-          plan_type: 'data', // Use 'data' instead of 'welcome_bonus' due to constraint
+          plan_type: 'data',
           status: 'active',
-          data_allocated: 0, // Start with 0, will be added through bonus claims
+          data_allocated: 200, // Start with first day bonus
           data_used: 0,
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
         })
         .select()
         .single();
@@ -264,7 +264,7 @@ class PlanService {
         .insert({
           user_id: user.id,
           type: 'data_purchase',
-          amount: -cost, // Negative because it's a deduction
+          amount: -cost,
           description: `Purchased ${dataMB}MB data plan`,
           status: 'completed'
         });
