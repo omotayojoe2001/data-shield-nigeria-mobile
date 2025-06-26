@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -6,7 +5,7 @@ import { vpnService } from '../services/vpnService';
 import { planService, type UserPlan } from '../services/planService';
 import { billingService } from '../services/billingService';
 import DailyBonusSection from './DailyBonusSection';
-import { Power, ShieldCheck, BarChart3 } from 'lucide-react';
+import { Power, ShieldCheck, BarChart3, Zap, Wallet, Database } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface HomeScreenProps {
@@ -21,6 +20,11 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
   const [activatingBonus, setActivatingBonus] = useState(false);
   const [bonusClaimStatus, setBonusClaimStatus] = useState<any>(null);
+  const [liveConsumption, setLiveConsumption] = useState<{
+    source: string;
+    amount: number;
+    remaining: number;
+  } | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -38,20 +42,53 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   }, [user]);
 
   useEffect(() => {
-    // Listen for plan updates
+    // Listen for plan updates and consumption events
     const handlePlanUpdate = () => {
       loadPlanData();
       loadBonusStatus();
     };
 
+    const handleBonusConsumed = (event: CustomEvent) => {
+      setLiveConsumption({
+        source: 'Welcome Bonus',
+        amount: event.detail.consumed,
+        remaining: event.detail.remaining
+      });
+      setTimeout(() => setLiveConsumption(null), 3000);
+    };
+
+    const handleDataConsumed = (event: CustomEvent) => {
+      setLiveConsumption({
+        source: 'Data Plan',
+        amount: event.detail.consumed,
+        remaining: event.detail.remaining
+      });
+      setTimeout(() => setLiveConsumption(null), 3000);
+    };
+
+    const handleWalletConsumed = (event: CustomEvent) => {
+      setLiveConsumption({
+        source: 'Pay-As-You-Go',
+        amount: event.detail.consumed,
+        remaining: event.detail.remaining
+      });
+      setTimeout(() => setLiveConsumption(null), 3000);
+    };
+
     window.addEventListener('plan-updated', handlePlanUpdate);
     window.addEventListener('wallet-updated', handlePlanUpdate);
     window.addEventListener('bonus-updated', handlePlanUpdate);
+    window.addEventListener('bonus-consumed', handleBonusConsumed);
+    window.addEventListener('data-consumed', handleDataConsumed);
+    window.addEventListener('wallet-consumed', handleWalletConsumed);
 
     return () => {
       window.removeEventListener('plan-updated', handlePlanUpdate);
       window.removeEventListener('wallet-updated', handlePlanUpdate);
       window.removeEventListener('bonus-updated', handlePlanUpdate);
+      window.removeEventListener('bonus-consumed', handleBonusConsumed);
+      window.removeEventListener('data-consumed', handleDataConsumed);
+      window.removeEventListener('wallet-consumed', handleWalletConsumed);
     };
   }, []);
 
@@ -142,36 +179,39 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   };
 
   const getPlanDisplayInfo = () => {
-    if (!currentPlan) return { name: 'No Plan', details: 'Activate your 7-day welcome bonus to get started!' };
+    if (!currentPlan) return { name: 'No Plan', details: 'Activate your 7-day welcome bonus to get started!', icon: ShieldCheck, color: 'text-gray-500' };
     
     switch (currentPlan.plan_type) {
-      case 'data':
+      case 'welcome_bonus':
         const remaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
         const expiryDate = currentPlan.expires_at ? new Date(currentPlan.expires_at) : null;
         const daysLeft = expiryDate ? Math.max(0, Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
-        
-        // Check if this is a welcome bonus plan (expires in 7 days or less and low data allocation)
-        const isWelcomeBonus = daysLeft <= 7 && currentPlan.data_allocated <= 1400; // 7 days * 200MB = 1400MB max
-        
-        if (isWelcomeBonus) {
-          return { 
-            name: 'Welcome Bonus Active', 
-            details: `${remaining}MB remaining (${daysLeft} days left)` 
-          };
-        } else {
-          const dataRemainingDisplay = remaining >= 1000 ? `${(remaining / 1000).toFixed(1)}GB` : `${remaining}MB`;
-          return { 
-            name: 'Data Plan', 
-            details: `${dataRemainingDisplay} remaining (${daysLeft} days left)` 
-          };
-        }
+        return { 
+          name: 'Welcome Bonus Active', 
+          details: `${remaining}MB remaining (${daysLeft} days left)`,
+          icon: Database,
+          color: 'text-purple-600'
+        };
+      case 'data':
+        const dataRemaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
+        const dataRemainingDisplay = dataRemaining >= 1000 ? `${(dataRemaining / 1000).toFixed(1)}GB` : `${dataRemaining}MB`;
+        const dataExpiryDate = currentPlan.expires_at ? new Date(currentPlan.expires_at) : null;
+        const dataDaysLeft = dataExpiryDate ? Math.max(0, Math.ceil((dataExpiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
+        return { 
+          name: 'Data Plan', 
+          details: `${dataRemainingDisplay} remaining (${dataDaysLeft} days left)`,
+          icon: Database,
+          color: 'text-blue-600'
+        };
       case 'payg':
         return { 
           name: 'Pay-As-You-Go', 
-          details: `₦${((wallet?.balance || 0) / 100).toFixed(2)} balance remaining` 
+          details: `₦${((wallet?.balance || 0) / 100).toFixed(2)} balance remaining`,
+          icon: Wallet,
+          color: 'text-green-600'
         };
       default:
-        return { name: 'No Plan', details: 'Activate your 7-day welcome bonus to get started!' };
+        return { name: 'No Plan', details: 'Activate your 7-day welcome bonus to get started!', icon: ShieldCheck, color: 'text-gray-500' };
     }
   };
 
@@ -182,6 +222,26 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
 
   return (
     <div className={`min-h-screen pb-20 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-white'}`}>
+      {/* Live Consumption Indicator */}
+      {liveConsumption && (
+        <div className="fixed top-4 left-4 right-4 z-50 animate-in slide-in-from-top-2">
+          <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-xl shadow-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Zap size={16} className="animate-pulse" />
+                <span className="text-sm font-medium">Using: {liveConsumption.source}</span>
+              </div>
+              <div className="text-sm">
+                {liveConsumption.source === 'Pay-As-You-Go' 
+                  ? `₦${(liveConsumption.amount / 100).toFixed(2)} deducted`
+                  : `${liveConsumption.amount.toFixed(1)}MB consumed`
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header - Mobile Optimized */}
       <div className={`px-4 pt-8 pb-6 rounded-b-3xl shadow-xl ${theme === 'dark' ? 'bg-gradient-to-r from-gray-800 to-gray-900' : 'bg-gradient-to-r from-blue-900 to-blue-800'}`}>
         {/* Greeting - Mobile Optimized */}
@@ -256,27 +316,30 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
             </button>
           </div>
 
-          {/* Data Usage Today - Mobile Optimized */}
+          {/* Real-time Data Usage Today */}
           {vpnStats.isConnected && (
             <div className="grid grid-cols-2 gap-3 mt-3">
               <div className="text-center">
-                <div className="text-white text-base font-bold">{vpnStats.dataUsed.toFixed(0)}MB</div>
+                <div className="text-white text-base font-bold">{vpnStats.dataUsed.toFixed(1)}MB</div>
                 <div className={`text-xs ${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>Used Today</div>
               </div>
               <div className="text-center">
-                <div className="text-green-300 text-base font-bold">{vpnStats.dataSaved.toFixed(0)}MB</div>
+                <div className="text-green-300 text-base font-bold">{vpnStats.dataSaved.toFixed(1)}MB</div>
                 <div className={`text-xs ${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>Saved Today</div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Current Plan Status - Mobile Optimized */}
+        {/* Enhanced Current Plan Status with Real-time Updates */}
         <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20">
           <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <div className="text-white font-medium text-sm">{planInfo.name}</div>
-              <div className={`text-xs ${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>{planInfo.details}</div>
+            <div className="flex items-center space-x-2 flex-1">
+              <planInfo.icon size={16} className={`${planInfo.color} opacity-80`} />
+              <div className="flex-1">
+                <div className="text-white font-medium text-sm">{planInfo.name}</div>
+                <div className={`text-xs ${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>{planInfo.details}</div>
+              </div>
             </div>
             <button 
               onClick={() => onTabChange('plans')}

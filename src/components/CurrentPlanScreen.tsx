@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Zap, Wallet, Clock, Database } from 'lucide-react';
+import { Shield, Zap, Wallet, Clock, Database, TrendingDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { planService, type UserPlan } from '../services/planService';
+import { vpnService } from '../services/vpnService';
+import { Progress } from './ui/progress';
 import { toast } from 'sonner';
 
 interface CurrentPlanScreenProps {
@@ -15,20 +17,44 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
   const { theme } = useTheme();
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
   const [loading, setLoading] = useState(true);
+  const [vpnStats, setVpnStats] = useState(vpnService.getStats());
+  const [liveConsumption, setLiveConsumption] = useState<any>(null);
 
   useEffect(() => {
     loadCurrentPlan();
+    
+    const statsInterval = setInterval(() => {
+      setVpnStats(vpnService.getStats());
+    }, 1000);
+
+    return () => clearInterval(statsInterval);
   }, [user]);
 
   useEffect(() => {
-    // Listen for plan updates
+    // Listen for plan updates and consumption events
     const handlePlanUpdate = () => {
       loadCurrentPlan();
     };
 
+    const handleConsumption = (event: CustomEvent) => {
+      setLiveConsumption({
+        type: event.type,
+        data: event.detail,
+        timestamp: Date.now()
+      });
+      setTimeout(() => setLiveConsumption(null), 5000);
+    };
+
     window.addEventListener('plan-updated', handlePlanUpdate);
+    window.addEventListener('bonus-consumed', handleConsumption);
+    window.addEventListener('data-consumed', handleConsumption);
+    window.addEventListener('wallet-consumed', handleConsumption);
+
     return () => {
       window.removeEventListener('plan-updated', handlePlanUpdate);
+      window.removeEventListener('bonus-consumed', handleConsumption);
+      window.removeEventListener('data-consumed', handleConsumption);
+      window.removeEventListener('wallet-consumed', handleConsumption);
     };
   }, []);
 
@@ -100,6 +126,14 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
     return Math.min(100, (plan.data_used / plan.data_allocated) * 100);
   };
 
+  const getRemainingAmount = (plan: UserPlan) => {
+    if (plan.plan_type === 'payg') {
+      return `₦${((wallet?.balance || 0) / 100).toFixed(2)}`;
+    }
+    const remaining = Math.max(0, plan.data_allocated - plan.data_used);
+    return remaining >= 1000 ? `${(remaining / 1000).toFixed(1)}GB` : `${remaining}MB`;
+  };
+
   if (loading) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-white'}`}>
@@ -131,6 +165,34 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
 
   return (
     <div className={`min-h-screen pb-24 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-white'}`}>
+      {/* Live Consumption Alert */}
+      {liveConsumption && (
+        <div className="fixed top-4 left-4 right-4 z-50 animate-in slide-in-from-top-2">
+          <div className={`p-3 rounded-xl shadow-lg border ${
+            liveConsumption.type === 'bonus-consumed' ? 'bg-purple-500' :
+            liveConsumption.type === 'data-consumed' ? 'bg-blue-500' :
+            'bg-green-500'
+          } text-white`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <TrendingDown size={16} />
+                <span className="text-sm font-medium">
+                  {liveConsumption.type === 'bonus-consumed' ? 'Welcome Bonus' :
+                   liveConsumption.type === 'data-consumed' ? 'Data Plan' :
+                   'Pay-As-You-Go'} Usage
+                </span>
+              </div>
+              <div className="text-sm font-bold">
+                {liveConsumption.type === 'wallet-consumed' 
+                  ? `₦${(liveConsumption.data.consumed / 100).toFixed(2)}`
+                  : `${liveConsumption.data.consumed.toFixed(1)}MB`
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className={`px-6 pt-12 pb-8 rounded-b-3xl shadow-xl ${theme === 'dark' ? 'bg-gradient-to-r from-gray-800 to-gray-900' : 'bg-gradient-to-r from-blue-900 to-blue-800'}`}>
         <h1 className="text-white text-3xl font-bold mb-2">Current Plan</h1>
@@ -138,7 +200,7 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
       </div>
 
       <div className="px-6 mt-6">
-        {/* Plan Card */}
+        {/* Plan Card with Real-time Updates */}
         <div className={`rounded-3xl p-6 shadow-xl border mb-6 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
           <div className="flex items-center space-x-4 mb-6">
             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
@@ -148,7 +210,7 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
             }`}>
               {getPlanIcon(currentPlan.plan_type)}
             </div>
-            <div>
+            <div className="flex-1">
               <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
                 {getPlanName(currentPlan.plan_type)}
               </h2>
@@ -158,55 +220,89 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
             </div>
           </div>
 
-          {/* Usage Progress */}
+          {/* Real-time Usage Progress */}
           {currentPlan.plan_type !== 'payg' && (
             <div className="mb-6">
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex justify-between items-center mb-3">
                 <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>
-                  Data Usage
+                  Data Usage (Live)
                 </span>
-                <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
+                <span className={`text-sm font-bold ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
                   {currentPlan.data_used}MB / {currentPlan.data_allocated}MB
                 </span>
               </div>
-              <div className={`w-full h-3 rounded-full ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-100'}`}>
-                <div
-                  className={`h-3 rounded-full transition-all duration-300 ${
-                    getUsagePercentage(currentPlan) > 80 ? 'bg-red-500' :
-                    getUsagePercentage(currentPlan) > 60 ? 'bg-yellow-500' :
-                    'bg-green-500'
-                  }`}
-                  style={{ width: `${getUsagePercentage(currentPlan)}%` }}
-                ></div>
+              <Progress 
+                value={getUsagePercentage(currentPlan)} 
+                className={`h-4 ${
+                  getUsagePercentage(currentPlan) > 80 ? 'text-red-500' :
+                  getUsagePercentage(currentPlan) > 60 ? 'text-yellow-500' :
+                  'text-green-500'
+                }`}
+              />
+              <div className="flex justify-between items-center mt-2">
+                <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-blue-500'}`}>
+                  {getUsagePercentage(currentPlan).toFixed(1)}% used
+                </span>
+                <span className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
+                  {getRemainingAmount(currentPlan)} remaining
+                </span>
               </div>
             </div>
           )}
 
-          {/* Plan Details */}
+          {/* Real-time Statistics Grid */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'}`}>
               <div className="flex items-center space-x-2 mb-2">
                 <Database size={16} className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`} />
-                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Data Used</span>
+                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>
+                  {currentPlan.plan_type === 'payg' ? 'Today Used' : 'Total Used'}
+                </span>
               </div>
               <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
-                {currentPlan.data_used}MB
+                {currentPlan.plan_type === 'payg' 
+                  ? `${vpnStats.dataUsed.toFixed(1)}MB`
+                  : `${currentPlan.data_used}MB`
+                }
               </p>
             </div>
 
             <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'}`}>
               <div className="flex items-center space-x-2 mb-2">
-                <Clock size={16} className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`} />
+                {currentPlan.plan_type === 'payg' ? (
+                  <Wallet size={16} className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`} />
+                ) : (
+                  <Clock size={16} className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`} />
+                )}
                 <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>
-                  {currentPlan.plan_type === 'welcome_bonus' ? 'Expires' : 'Expires'}
+                  {currentPlan.plan_type === 'payg' ? 'Balance' : 'Expires'}
                 </span>
               </div>
               <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
-                {currentPlan.expires_at 
-                  ? new Date(currentPlan.expires_at).toLocaleDateString()
-                  : 'Never'
+                {currentPlan.plan_type === 'payg' 
+                  ? `₦${((wallet?.balance || 0) / 100).toFixed(2)}`
+                  : (currentPlan.expires_at 
+                      ? new Date(currentPlan.expires_at).toLocaleDateString()
+                      : 'Never')
                 }
               </p>
+            </div>
+          </div>
+
+          {/* VPN Connection Status */}
+          <div className={`p-4 rounded-xl mb-6 ${theme === 'dark' ? 'bg-gray-700' : 'bg-green-50'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className={`w-3 h-3 rounded-full ${vpnStats.isConnected ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></div>
+                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-green-700'}`}>
+                  VPN Status: {vpnStats.isConnected ? 'Connected' : 'Disconnected'}
+                </span>
+              </div>
+              {vpnStats.isConnected && (
+                <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-green-600'}`}>
+                  {vpnStats.location} • {vpnStats.speed}
+                </span>
+              )}
             </div>
           </div>
 
@@ -234,9 +330,9 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
           </div>
         </div>
 
-        {/* Plan Features */}
+        {/* Enhanced Plan Features */}
         <div className={`rounded-3xl p-6 shadow-xl border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
-          <h3 className={`text-xl font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Plan Features</h3>
+          <h3 className={`text-xl font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Plan Features & Benefits</h3>
           
           <div className="space-y-3">
             {currentPlan.plan_type === 'welcome_bonus' && (
@@ -249,10 +345,6 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
                   <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Daily bonus claim</span>
                   <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>200MB</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Data compression</span>
-                  <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Up to 70%</span>
-                </div>
               </>
             )}
             
@@ -263,12 +355,14 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
                   <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>₦0.20</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Data compression</span>
-                  <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Up to 70%</span>
-                </div>
-                <div className="flex items-center justify-between">
                   <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Billing</span>
                   <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Real-time</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Today's cost</span>
+                  <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>
+                    ₦{(vpnStats.dataUsed * 0.20).toFixed(2)}
+                  </span>
                 </div>
               </>
             )}
@@ -285,15 +379,21 @@ const CurrentPlanScreen = ({ onTabChange }: CurrentPlanScreenProps) => {
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Data compression</span>
-                  <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Up to 70%</span>
-                </div>
-                <div className="flex items-center justify-between">
                   <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Validity</span>
                   <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>30 days</span>
                 </div>
               </>
             )}
+
+            {/* Common features for all plans */}
+            <div className="flex items-center justify-between">
+              <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Data compression</span>
+              <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Up to 70%</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>Real-time monitoring</span>
+              <span className={`font-semibold text-green-600`}>✓ Active</span>
+            </div>
           </div>
         </div>
       </div>
