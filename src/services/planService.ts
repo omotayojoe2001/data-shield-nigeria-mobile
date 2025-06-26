@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { bonusService } from './bonusService';
+import { referralService } from './referralService';
 
 export interface UserPlan {
   id: string;
@@ -34,16 +35,23 @@ class PlanService {
       // If no active plan found, check if user is eligible for welcome bonus
       if (!data) {
         console.log('No active plan found, checking welcome bonus eligibility');
-        const bonusStatus = await bonusService.getBonusClaimStatus();
         
-        if (bonusStatus && bonusStatus.is_eligible && bonusStatus.days_claimed < 7) {
-          // Create welcome bonus plan
-          await this.createWelcomeBonusPlan(user.id);
-          return await this.getCurrentPlan();
-        } else {
-          // No plan and no bonus eligibility - user must choose a plan
-          return null;
+        // Check if user already has any plan history to avoid recreating
+        const { data: existingPlans } = await supabase
+          .from('user_plans')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1);
+
+        if (!existingPlans || existingPlans.length === 0) {
+          // First time user - create welcome bonus
+          const created = await this.createWelcomeBonusPlan(user.id);
+          if (created) {
+            return await this.getCurrentPlan();
+          }
         }
+        
+        return null;
       }
 
       return data as UserPlan;
@@ -55,18 +63,25 @@ class PlanService {
 
   async createWelcomeBonusPlan(userId: string): Promise<boolean> {
     try {
+      console.log('Creating welcome bonus plan for user:', userId);
+      
       const { error } = await supabase
         .from('user_plans')
         .insert({
           user_id: userId,
           plan_type: 'welcome_bonus',
           status: 'active',
-          data_allocated: 0, // Data comes from daily bonus claims
+          data_allocated: 200, // Start with 200MB for first bonus claim
           data_used: 0,
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating welcome bonus plan:', error);
+        return false;
+      }
+      
+      console.log('Welcome bonus plan created successfully');
       return true;
     } catch (error) {
       console.error('Error creating welcome bonus plan:', error);
@@ -203,6 +218,18 @@ class PlanService {
         .eq('user_id', user.id);
 
       if (walletError) throw walletError;
+
+      // Process referral earnings for the referrer
+      const { data: referral } = await supabase
+        .from('referrals')
+        .select('referrer_id')
+        .eq('referee_id', user.id)
+        .eq('status', 'completed')
+        .single();
+
+      if (referral?.referrer_id) {
+        await referralService.processReferralEarning(referral.referrer_id, cost);
+      }
 
       // Record transaction
       await supabase

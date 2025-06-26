@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Share2, Gift, Trophy, Copy, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { referralService } from '@/services/referralService';
 import { toast } from 'sonner';
 
 const ReferralScreen = () => {
@@ -11,8 +12,9 @@ const ReferralScreen = () => {
   const [referralCode, setReferralCode] = useState('');
   const [referralStats, setReferralStats] = useState({
     totalReferrals: 0,
-    totalEarned: 0,
-    pendingRewards: 0
+    totalEarnings: 0,
+    currentCommissionRate: 2.0,
+    nextMilestone: 50
   });
 
   useEffect(() => {
@@ -36,27 +38,9 @@ const ReferralScreen = () => {
         setReferralCode(codeData.referral_code);
       }
 
-      // Get referral stats
-      const { data: referrals } = await supabase
-        .from('referrals')
-        .select('*')
-        .eq('referrer_id', user.id);
-
-      if (referrals) {
-        const totalReferrals = referrals.length;
-        const totalEarned = referrals
-          .filter(r => r.status === 'completed')
-          .reduce((sum, r) => sum + (r.reward_amount || 0), 0);
-        const pendingRewards = referrals
-          .filter(r => r.status === 'pending')
-          .reduce((sum, r) => sum + (r.reward_amount || 0), 0);
-
-        setReferralStats({
-          totalReferrals,
-          totalEarned,
-          pendingRewards
-        });
-      }
+      // Get enhanced referral stats
+      const stats = await referralService.getReferralStats(user.id);
+      setReferralStats(stats);
     } catch (error) {
       console.error('Error fetching referral data:', error);
     }
@@ -76,18 +60,29 @@ const ReferralScreen = () => {
   };
 
   const handleShare = async () => {
+    const shareText = `Save money on data with GoData VPN! Get started with 7 days of FREE data using my referral code: ${referralCode}`;
+    
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Join GoodDeeds VPN',
-          text: 'Save data with GoodDeeds VPN! Use my referral code to get started.',
+          title: 'Join GoData VPN - Save on Data!',
+          text: shareText,
           url: referralLink,
         });
       } catch (err) {
-        handleCopy();
+        if (err.name !== 'AbortError') {
+          handleCopy();
+        }
       }
     } else {
-      handleCopy();
+      // Fallback for desktop - create a shareable message
+      const shareData = `${shareText}\n\n${referralLink}`;
+      try {
+        await navigator.clipboard.writeText(shareData);
+        toast.success('Share message copied to clipboard!');
+      } catch (err) {
+        handleCopy();
+      }
     }
   };
 
@@ -97,7 +92,13 @@ const ReferralScreen = () => {
 
   const badges = [
     { name: 'First Referral', icon: '🎯', earned: referralStats.totalReferrals >= 1, requirement: 'Refer 1 friend' },
-    { name: 'Referral Champion', icon: '👑', earned: referralStats.totalReferrals >= 5, requirement: 'Refer 5 friends' },
+    { 
+      name: 'High Earner', 
+      icon: '💰', 
+      earned: referralStats.totalReferrals >= 50, 
+      requirement: '3% commission (50+ referrals)',
+      special: true 
+    },
     { name: 'Community Builder', icon: '🌟', earned: referralStats.totalReferrals >= 10, requirement: 'Refer 10 friends' },
     { name: 'Ambassador', icon: '🏆', earned: referralStats.totalReferrals >= 25, requirement: 'Refer 25 friends' }
   ];
@@ -106,7 +107,7 @@ const ReferralScreen = () => {
     { friends: 1, reward: '₦200', achieved: referralStats.totalReferrals >= 1 },
     { friends: 5, reward: '₦1,000', achieved: referralStats.totalReferrals >= 5 },
     { friends: 10, reward: '₦2,500', achieved: referralStats.totalReferrals >= 10 },
-    { friends: 25, reward: 'Free Monthly Plan', achieved: referralStats.totalReferrals >= 25 }
+    { friends: 50, reward: '3% Commission Rate', achieved: referralStats.totalReferrals >= 50, special: true }
   ];
 
   return (
@@ -116,33 +117,42 @@ const ReferralScreen = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-white text-3xl font-bold">Refer & Earn</h1>
-            <p className="text-blue-200">Share and get rewarded together</p>
+            <p className="text-blue-200">
+              Earn {referralStats.currentCommissionRate}% commission for life!
+              {referralStats.nextMilestone && ` (${referralStats.nextMilestone} more for 3%)`}
+            </p>
           </div>
           <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
             <Users size={24} className="text-white" />
           </div>
         </div>
 
-        {/* Stats Card */}
+        {/* Enhanced Stats Card */}
         <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-6 border border-white/20">
-          <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="grid grid-cols-3 gap-4 text-center mb-4">
             <div>
               <div className="text-3xl font-bold text-white">{referralStats.totalReferrals}</div>
-              <div className="text-blue-200 text-sm">Friends Referred</div>
+              <div className="text-blue-200 text-sm">Total Referrals</div>
             </div>
             <div>
               <div className="text-3xl font-bold text-cyan-300">
-                {formatAmount(referralStats.totalEarned)}
+                {formatAmount(referralStats.totalEarnings)}
               </div>
-              <div className="text-blue-200 text-sm">Total Earned</div>
+              <div className="text-blue-200 text-sm">Lifetime Earnings</div>
             </div>
             <div>
               <div className="text-3xl font-bold text-green-300">
-                {formatAmount(referralStats.pendingRewards)}
+                {referralStats.currentCommissionRate}%
               </div>
-              <div className="text-blue-200 text-sm">Pending</div>
+              <div className="text-blue-200 text-sm">Commission Rate</div>
             </div>
           </div>
+          
+          {referralStats.nextMilestone && (
+            <div className="text-center text-white/80 text-sm">
+              Refer {referralStats.nextMilestone} more friends to unlock 3% commission rate!
+            </div>
+          )}
         </div>
       </div>
 
@@ -183,7 +193,7 @@ const ReferralScreen = () => {
           </div>
         </div>
 
-        {/* How it Works */}
+        {/* Enhanced How it Works */}
         <div className="bg-gradient-to-r from-cyan-400 to-blue-500 rounded-3xl p-6 text-white shadow-xl mb-6">
           <h3 className="text-xl font-bold mb-4">How It Works</h3>
           <div className="space-y-3">
@@ -193,16 +203,22 @@ const ReferralScreen = () => {
             </div>
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-bold">2</div>
-              <span>They sign up using your code</span>
+              <span>They sign up and start using GoData</span>
             </div>
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-bold">3</div>
-              <span>Both of you get rewards!</span>
+              <span>Earn {referralStats.currentCommissionRate}% of their data purchases forever!</span>
             </div>
+            {referralStats.totalReferrals >= 50 && (
+              <div className="mt-4 p-3 bg-white/20 rounded-lg">
+                <div className="text-center font-bold">🎉 Premium Referrer Status!</div>
+                <div className="text-center text-sm">You earn 3% on all referral purchases</div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Milestones */}
+        {/* Enhanced Milestones */}
         <div className="bg-white rounded-3xl p-6 shadow-xl border border-blue-100 mb-6">
           <h3 className="text-xl font-bold text-blue-900 mb-4 flex items-center">
             <Trophy size={20} className="mr-2" />
@@ -213,23 +229,31 @@ const ReferralScreen = () => {
             {milestones.map((milestone, index) => (
               <div key={index} className={`p-4 rounded-xl border-2 ${
                 milestone.achieved 
-                  ? 'border-green-500 bg-green-50' 
+                  ? milestone.special 
+                    ? 'border-purple-500 bg-purple-50' 
+                    : 'border-green-500 bg-green-50'
                   : 'border-blue-200 bg-blue-50'
               }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                      milestone.achieved ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'
+                      milestone.achieved 
+                        ? milestone.special 
+                          ? 'bg-purple-500 text-white' 
+                          : 'bg-green-500 text-white'
+                        : 'bg-blue-500 text-white'
                     }`}>
                       {milestone.friends}
                     </div>
                     <div>
                       <p className="font-semibold text-blue-900">{milestone.friends} Friends</p>
-                      <p className="text-sm text-blue-600">{milestone.reward}</p>
+                      <p className={`text-sm ${milestone.special ? 'text-purple-600 font-bold' : 'text-blue-600'}`}>
+                        {milestone.reward}
+                      </p>
                     </div>
                   </div>
                   {milestone.achieved && (
-                    <Check size={20} className="text-green-500" />
+                    <Check size={20} className={milestone.special ? 'text-purple-500' : 'text-green-500'} />
                   )}
                 </div>
               </div>
@@ -237,7 +261,7 @@ const ReferralScreen = () => {
           </div>
         </div>
 
-        {/* Badges */}
+        {/* Enhanced Badges */}
         <div className="bg-white rounded-3xl p-6 shadow-xl border border-blue-100">
           <h3 className="text-xl font-bold text-blue-900 mb-4 flex items-center">
             <Gift size={20} className="mr-2" />
@@ -248,7 +272,9 @@ const ReferralScreen = () => {
             {badges.map((badge, index) => (
               <div key={index} className={`p-4 rounded-xl text-center ${
                 badge.earned 
-                  ? 'bg-gradient-to-br from-yellow-100 to-orange-100 border-2 border-yellow-300' 
+                  ? badge.special
+                    ? 'bg-gradient-to-br from-purple-100 to-pink-100 border-2 border-purple-300' 
+                    : 'bg-gradient-to-br from-yellow-100 to-orange-100 border-2 border-yellow-300'
                   : 'bg-gray-100 border-2 border-gray-200'
               }`}>
                 <div className="text-3xl mb-2">{badge.icon}</div>
@@ -260,7 +286,11 @@ const ReferralScreen = () => {
                 </div>
                 {badge.earned && (
                   <div className="mt-2">
-                    <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs">Earned!</span>
+                    <span className={`px-2 py-1 rounded-full text-xs text-white ${
+                      badge.special ? 'bg-purple-500' : 'bg-green-500'
+                    }`}>
+                      {badge.special ? 'Premium!' : 'Earned!'}
+                    </span>
                   </div>
                 )}
               </div>

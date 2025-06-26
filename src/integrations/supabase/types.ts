@@ -9,6 +9,27 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_config: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string | null
+          value: Json
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string | null
+          value: Json
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       daily_bonus_claims: {
         Row: {
           created_at: string
@@ -18,6 +39,8 @@ export type Database = {
           last_claimed_at: string
           next_claim_at: string
           user_id: string | null
+          welcome_bonus_active: boolean | null
+          welcome_bonus_start_date: string | null
         }
         Insert: {
           created_at?: string
@@ -27,6 +50,8 @@ export type Database = {
           last_claimed_at?: string
           next_claim_at?: string
           user_id?: string | null
+          welcome_bonus_active?: boolean | null
+          welcome_bonus_start_date?: string | null
         }
         Update: {
           created_at?: string
@@ -36,6 +61,8 @@ export type Database = {
           last_claimed_at?: string
           next_claim_at?: string
           user_id?: string | null
+          welcome_bonus_active?: boolean | null
+          welcome_bonus_start_date?: string | null
         }
         Relationships: []
       }
@@ -99,30 +126,72 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          device_id: string | null
           full_name: string | null
           id: string
+          is_suspended: boolean | null
           phone: string | null
           profile_image_url: string | null
           updated_at: string
           user_id: string | null
+          vpn_key_id: string | null
+          vpn_key_url: string | null
         }
         Insert: {
           created_at?: string
+          device_id?: string | null
           full_name?: string | null
           id?: string
+          is_suspended?: boolean | null
           phone?: string | null
           profile_image_url?: string | null
           updated_at?: string
           user_id?: string | null
+          vpn_key_id?: string | null
+          vpn_key_url?: string | null
         }
         Update: {
           created_at?: string
+          device_id?: string | null
           full_name?: string | null
           id?: string
+          is_suspended?: boolean | null
           phone?: string | null
           profile_image_url?: string | null
           updated_at?: string
           user_id?: string | null
+          vpn_key_id?: string | null
+          vpn_key_url?: string | null
+        }
+        Relationships: []
+      }
+      referral_earnings: {
+        Row: {
+          commission_amount: number
+          commission_rate: number | null
+          created_at: string | null
+          id: string
+          purchase_amount: number
+          referee_id: string | null
+          referrer_id: string | null
+        }
+        Insert: {
+          commission_amount: number
+          commission_rate?: number | null
+          created_at?: string | null
+          id?: string
+          purchase_amount: number
+          referee_id?: string | null
+          referrer_id?: string | null
+        }
+        Update: {
+          commission_amount?: number
+          commission_rate?: number | null
+          created_at?: string | null
+          id?: string
+          purchase_amount?: number
+          referee_id?: string | null
+          referrer_id?: string | null
         }
         Relationships: []
       }
@@ -219,6 +288,36 @@ export type Database = {
         }
         Relationships: []
       }
+      usage_logs: {
+        Row: {
+          created_at: string | null
+          id: string
+          timestamp: string | null
+          used_bytes: number
+          used_naira: number
+          user_id: string | null
+          vpn_key_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          timestamp?: string | null
+          used_bytes: number
+          used_naira: number
+          user_id?: string | null
+          vpn_key_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          timestamp?: string | null
+          used_bytes?: number
+          used_naira?: number
+          user_id?: string | null
+          vpn_key_id?: string | null
+        }
+        Relationships: []
+      }
       user_plans: {
         Row: {
           created_at: string
@@ -284,6 +383,7 @@ export type Database = {
           balance: number
           created_at: string
           id: string
+          referral_bonus: number | null
           updated_at: string
           user_id: string | null
         }
@@ -291,6 +391,7 @@ export type Database = {
           balance?: number
           created_at?: string
           id?: string
+          referral_bonus?: number | null
           updated_at?: string
           user_id?: string | null
         }
@@ -298,6 +399,7 @@ export type Database = {
           balance?: number
           created_at?: string
           id?: string
+          referral_bonus?: number | null
           updated_at?: string
           user_id?: string | null
         }

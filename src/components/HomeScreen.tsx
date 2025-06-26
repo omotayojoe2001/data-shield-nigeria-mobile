@@ -74,8 +74,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         // Check if user can connect based on their plan
         const plan = await planService.getCurrentPlan();
         if (!plan) {
-          toast.error('No active plan found! Please choose a plan or claim your welcome bonus.');
-          onTabChange('plans');
+          toast.error('No active plan found! Please claim your welcome bonus or choose a plan.');
           return;
         }
         
@@ -116,7 +115,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   };
 
   const getPlanDisplayInfo = () => {
-    if (!currentPlan) return { name: 'No Plan', details: 'Choose a plan to get started' };
+    if (!currentPlan) return { name: 'No Plan', details: 'Claim your 7-day welcome bonus to get started!' };
     
     switch (currentPlan.plan_type) {
       case 'welcome_bonus':
@@ -124,7 +123,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         const expiryDate = currentPlan.expires_at ? new Date(currentPlan.expires_at) : null;
         const daysLeft = expiryDate ? Math.max(0, Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
         return { 
-          name: 'Welcome Bonus', 
+          name: 'Welcome Bonus Active', 
           details: `${remaining}MB remaining (${daysLeft} days left)` 
         };
       case 'payg':
@@ -142,7 +141,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
           details: `${dataRemainingDisplay} remaining (${dataDaysLeft} days left)` 
         };
       default:
-        return { name: 'No Plan', details: 'Choose a plan to get started' };
+        return { name: 'No Plan', details: 'Claim your 7-day welcome bonus to get started!' };
     }
   };
 
@@ -165,6 +164,19 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
             <div className="text-white text-xl font-bold">₦{((wallet?.balance || 0) / 100).toFixed(2)}</div>
           </div>
         </div>
+
+        {/* Welcome Bonus Alert - Show prominently for new users */}
+        {(!currentPlan || currentPlan.plan_type === 'welcome_bonus') && (
+          <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-4 mb-4 border border-white/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-white font-bold text-lg">🎁 7-Day Welcome Bonus</h3>
+                <p className="text-white/90 text-sm">Get 200MB FREE daily for 7 days!</p>
+              </div>
+              <DailyBonusSection compact={true} />
+            </div>
+          </div>
+        )}
 
         {/* VPN Status Card */}
         <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-6 border border-white/20 mb-4">
@@ -226,37 +238,32 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
               onClick={() => onTabChange('plans')}
               className="px-4 py-2 bg-white/20 rounded-xl text-white text-sm font-medium hover:bg-white/30 transition-all duration-300"
             >
-              {!currentPlan ? 'Choose Plan' : 'View All Plans'}
+              {!currentPlan ? 'Get Started' : 'View Plans'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Daily Bonus - only show for welcome bonus users */}
+      {/* Daily Bonus Section - Full version for welcome bonus users */}
       {currentPlan?.plan_type === 'welcome_bonus' && (
         <div className="px-6 mt-6">
           <DailyBonusSection />
         </div>
       )}
 
-      {/* No Plan Warning */}
+      {/* No Plan Warning - Updated for welcome bonus */}
       {!currentPlan && (
         <div className="px-6 mt-6">
-          <div className={`rounded-2xl p-6 shadow-lg border-2 border-orange-500 ${theme === 'dark' ? 'bg-gray-800' : 'bg-orange-50'}`}>
+          <div className={`rounded-2xl p-6 shadow-lg border-2 border-purple-500 ${theme === 'dark' ? 'bg-gray-800' : 'bg-purple-50'}`}>
             <div className="text-center">
-              <div className="text-4xl mb-3">⚠️</div>
-              <h3 className={`text-lg font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-orange-900'}`}>
-                No Active Plan
+              <div className="text-4xl mb-3">🎁</div>
+              <h3 className={`text-lg font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-purple-900'}`}>
+                Welcome to GoData!
               </h3>
-              <p className={`mb-4 ${theme === 'dark' ? 'text-gray-300' : 'text-orange-700'}`}>
-                You need to choose a plan to start using GoData. New users get a 7-day welcome bonus!
+              <p className={`mb-4 ${theme === 'dark' ? 'text-gray-300' : 'text-purple-700'}`}>
+                Start your journey with our 7-day welcome bonus! Get 200MB FREE daily for your first week.
               </p>
-              <button 
-                onClick={() => onTabChange('plans')}
-                className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition-all duration-300"
-              >
-                Choose Your Plan
-              </button>
+              <DailyBonusSection />
             </div>
           </div>
         </div>
