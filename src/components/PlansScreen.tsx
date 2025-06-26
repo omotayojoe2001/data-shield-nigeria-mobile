@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Shield, Zap, Wallet, CheckCircle, ArrowRight, Database, Gift } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -59,6 +58,7 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
     try {
       const plan = await planService.getCurrentPlan();
       setCurrentPlan(plan);
+      console.log('Current plan loaded in PlansScreen:', plan);
       
       // Set default tab based on current plan or eligibility
       if (!plan) {
@@ -69,7 +69,14 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
           setSelectedTab('data');
         }
       } else {
-        setSelectedTab('data');
+        // Set tab based on current plan type
+        if (plan.plan_type === 'welcome_bonus') {
+          setSelectedTab('welcome');
+        } else if (plan.plan_type === 'payg') {
+          setSelectedTab('payg');
+        } else {
+          setSelectedTab('data');
+        }
       }
     } catch (error) {
       console.error('Error loading current plan:', error);
@@ -117,6 +124,12 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
       return;
     }
 
+    // Check if already on this plan type
+    if (currentPlan && currentPlan.plan_type === planType) {
+      toast.info(`You are already on the ${planType === 'payg' ? 'Pay-As-You-Go' : 'Data Plan'} plan`);
+      return;
+    }
+
     if (loading) return;
 
     setLoading(true);
@@ -126,7 +139,7 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
         toast.success(`Successfully switched to ${planType === 'payg' ? 'Pay-As-You-Go' : 'Data Plan'}`);
         window.dispatchEvent(new CustomEvent('plan-updated'));
         await loadCurrentPlan();
-        onTabChange('home');
+        // Don't navigate away, let user see the change
       } else {
         toast.error('Failed to switch plan');
       }
@@ -187,8 +200,8 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
   };
 
   // Check if user is eligible for welcome bonus
-  const isWelcomeBonusEligible = bonusInfo.daysRemaining > 0 || bonusInfo.daysClaimed < 7;
-  const showWelcomeTab = !currentPlan && isWelcomeBonusEligible;
+  const isWelcomeBonusEligible = bonusInfo.daysClaimed < 7; // Allow activation anytime within 7 days
+  const showWelcomeTab = isWelcomeBonusEligible;
 
   return (
     <div className={`min-h-screen pb-20 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-white'}`}>
@@ -196,6 +209,19 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
       <div className={`px-4 pt-12 pb-6 rounded-b-3xl shadow-xl ${theme === 'dark' ? 'bg-gradient-to-r from-gray-800 to-gray-900' : 'bg-gradient-to-r from-blue-900 to-blue-800'}`}>
         <h1 className="text-white text-2xl font-bold mb-2">Choose Your Plan</h1>
         <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-200'}`}>Save more data with GoodDeeds Data compression</p>
+        
+        {/* Current Plan Indicator */}
+        {currentPlan && (
+          <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20">
+            <div className="text-white text-sm">
+              Current Plan: <span className="font-semibold">
+                {currentPlan.plan_type === 'welcome_bonus' ? 'Welcome Bonus' :
+                 currentPlan.plan_type === 'payg' ? 'Pay-As-You-Go' :
+                 currentPlan.plan_type === 'data' ? 'Data Plan' : currentPlan.plan_type}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tab Selector - Mobile Optimized */}
@@ -281,11 +307,13 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
               disabled={loading}
               className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl font-semibold hover:shadow-xl transition-all duration-300 disabled:opacity-50"
             >
-              {loading ? 'Activating...' : 'Activate Welcome Bonus'}
+              {loading ? 'Activating...' : 
+               currentPlan?.plan_type === 'welcome_bonus' ? 'Welcome Bonus Active' : 
+               'Activate Welcome Bonus'}
             </button>
 
             <p className={`text-xs text-center mt-2 ${theme === 'dark' ? 'text-gray-400' : 'text-purple-500'}`}>
-              * After 7 days, choose between Pay-As-You-Go or Data plans
+              * Switch to welcome bonus anytime within your first 7 days
             </p>
           </div>
         </div>
@@ -365,7 +393,7 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
               disabled={loading || currentPlan?.plan_type === 'payg'}
               className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold hover:shadow-xl transition-all duration-300 disabled:opacity-50"
             >
-              {currentPlan?.plan_type === 'payg' ? 'Current Plan' : loading ? 'Switching...' : 'Switch to Pay-As-You-Go'}
+              {currentPlan?.plan_type === 'payg' ? 'Current Plan ✓' : loading ? 'Switching...' : 'Switch to Pay-As-You-Go'}
             </button>
           </div>
         </div>

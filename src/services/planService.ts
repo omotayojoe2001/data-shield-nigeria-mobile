@@ -19,20 +19,29 @@ class PlanService {
   async getCurrentPlan(): Promise<UserPlan | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      if (!user) {
+        console.log('No authenticated user found');
+        return null;
+      }
 
+      console.log(`Fetching current plan for user: ${user.id}`);
+      
       const { data, error } = await supabase
         .from('user_plans')
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .single();
+        .order('updated_at', { ascending: false })
+        .limit(1);
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
+      if (error) {
+        console.error('Error fetching current plan:', error);
+        return null;
       }
 
-      return data as UserPlan || null;
+      const plan = data && data.length > 0 ? data[0] as UserPlan : null;
+      console.log('Current plan fetched:', plan);
+      return plan;
     } catch (error) {
       console.error('Error fetching current plan:', error);
       return null;
@@ -43,20 +52,21 @@ class PlanService {
     try {
       console.log('Creating welcome bonus plan for user:', userId);
       
-      // Check if user already has any active plan
-      const { data: existingPlans } = await supabase
+      // Deactivate any existing active plans first
+      const { error: deactivateError } = await supabase
         .from('user_plans')
-        .select('id, plan_type, status')
+        .update({ 
+          status: 'inactive',
+          updated_at: new Date().toISOString()
+        })
         .eq('user_id', userId)
-        .eq('status', 'active')
-        .limit(1);
+        .eq('status', 'active');
 
-      if (existingPlans && existingPlans.length > 0) {
-        console.log('User already has an active plan:', existingPlans[0]);
-        return false;
+      if (deactivateError) {
+        console.error('Error deactivating existing plans:', deactivateError);
       }
       
-      // Create welcome bonus plan (not data plan)
+      // Create welcome bonus plan
       const { data: newPlan, error } = await supabase
         .from('user_plans')
         .insert({
@@ -88,19 +98,13 @@ class PlanService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return { success: false, message: 'User not authenticated' };
 
-      // Check if user already has an active plan
-      const currentPlan = await this.getCurrentPlan();
-      if (currentPlan) {
-        return { success: false, message: 'You already have an active plan' };
-      }
-
-      // Check bonus eligibility
+      // Check bonus eligibility (allow activation even if user has other plans)
       const bonusStatus = await bonusService.getBonusClaimStatus();
-      if (!bonusStatus || bonusStatus.days_claimed >= 7) {
-        return { success: false, message: 'Welcome bonus period has ended' };
+      if (bonusStatus && bonusStatus.days_claimed >= 7) {
+        return { success: false, message: 'Welcome bonus period has ended - you have already claimed all 7 days' };
       }
 
-      // Create the welcome bonus plan
+      // Create the welcome bonus plan (this will deactivate other plans)
       const success = await this.createWelcomeBonusPlan(user.id);
       if (!success) {
         return { success: false, message: 'Failed to activate welcome bonus' };
@@ -121,7 +125,15 @@ class PlanService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
 
+      console.log(`Switching to plan: ${newPlanType} for user: ${user.id}`);
+
       const currentPlan = await this.getCurrentPlan();
+
+      // Check if already on the requested plan type
+      if (currentPlan && currentPlan.plan_type === newPlanType) {
+        console.log(`User is already on ${newPlanType} plan`);
+        return true; // Return true since they're already on the correct plan
+      }
 
       // Store data plan information before switching
       let preservedDataInfo: { allocated: number; used: number; expires_at?: string } | null = null;
@@ -136,13 +148,17 @@ class PlanService {
 
       // Deactivate current plan if it exists
       if (currentPlan) {
-        await supabase
+        const { error: deactivateError } = await supabase
           .from('user_plans')
           .update({ 
             status: 'inactive', 
             updated_at: new Date().toISOString()
           })
           .eq('id', currentPlan.id);
+
+        if (deactivateError) {
+          console.error('Error deactivating current plan:', deactivateError);
+        }
 
         // Record plan change
         await supabase
@@ -183,11 +199,18 @@ class PlanService {
         newPlan.expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       }
 
-      const { error } = await supabase
+      const { data: createdPlan, error } = await supabase
         .from('user_plans')
-        .insert(newPlan);
+        .insert(newPlan)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating new plan:', error);
+        throw error;
+      }
+
+      console.log('New plan created successfully:', createdPlan);
 
       // Trigger UI updates
       window.dispatchEvent(new CustomEvent('plan-updated'));
