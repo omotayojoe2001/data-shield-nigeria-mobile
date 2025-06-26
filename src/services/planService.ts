@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { bonusService } from './bonusService';
 import { referralService } from './referralService';
@@ -5,7 +6,7 @@ import { referralService } from './referralService';
 export interface UserPlan {
   id: string;
   user_id: string;
-  plan_type: 'payg' | 'data';
+  plan_type: 'payg' | 'data' | 'welcome_bonus';
   status: 'active' | 'inactive' | 'expired';
   data_allocated: number;
   data_used: number;
