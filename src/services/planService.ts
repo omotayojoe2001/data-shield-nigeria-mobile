@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { bonusService } from './bonusService';
 import { referralService } from './referralService';
@@ -57,12 +56,12 @@ class PlanService {
         return false;
       }
       
-      // Create data plan for welcome bonus
+      // Create welcome bonus plan (not data plan)
       const { data: newPlan, error } = await supabase
         .from('user_plans')
         .insert({
           user_id: userId,
-          plan_type: 'data',
+          plan_type: 'welcome_bonus',
           status: 'active',
           data_allocated: 200, // Start with first day bonus
           data_used: 0,
@@ -117,7 +116,7 @@ class PlanService {
     }
   }
 
-  async switchPlan(newPlanType: 'payg' | 'data', dataMB?: number): Promise<boolean> {
+  async switchPlan(newPlanType: 'payg' | 'data' | 'welcome_bonus', dataMB?: number): Promise<boolean> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
@@ -178,6 +177,10 @@ class PlanService {
           newPlan.data_used = 0;
           newPlan.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
         }
+      } else if (newPlanType === 'welcome_bonus') {
+        newPlan.data_allocated = 200;
+        newPlan.data_used = 0;
+        newPlan.expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       }
 
       const { error } = await supabase
