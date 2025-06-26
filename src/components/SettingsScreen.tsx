@@ -32,7 +32,12 @@ const SettingsScreen = ({ onTabChange }: SettingsScreenProps) => {
           subtitle: 'Update your password', 
           action: () => onTabChange && onTabChange('profile')
         },
-        { icon: Shield, label: 'Privacy & Security', subtitle: 'Manage your privacy', action: () => {} }
+        { 
+          icon: Shield, 
+          label: 'Privacy & Security', 
+          subtitle: 'Manage your privacy', 
+          action: () => onTabChange && onTabChange('support')
+        }
       ]
     },
     {
@@ -68,8 +73,18 @@ const SettingsScreen = ({ onTabChange }: SettingsScreenProps) => {
     {
       title: 'Help & Support',
       items: [
-        { icon: HelpCircle, label: 'FAQ & Help', subtitle: 'Common questions', action: () => {} },
-        { icon: Shield, label: 'Terms & Privacy', subtitle: 'Legal information', action: () => {} }
+        { 
+          icon: HelpCircle, 
+          label: 'FAQ & Help', 
+          subtitle: 'Common questions', 
+          action: () => onTabChange && onTabChange('support')
+        },
+        { 
+          icon: Shield, 
+          label: 'Terms & Privacy', 
+          subtitle: 'Legal information', 
+          action: () => onTabChange && onTabChange('support')
+        }
       ]
     }
   ];
@@ -168,11 +183,11 @@ const SettingsScreen = ({ onTabChange }: SettingsScreenProps) => {
             
             <details className="group">
               <summary className={`flex items-center justify-between p-3 rounded-xl cursor-pointer ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'}`}>
-                <span className={`font-semibold text-sm ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Why do I need MTN data?</span>
+                <span className={`font-semibold text-sm ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>How do I activate my plan?</span>
                 <span className={`group-open:rotate-180 transition-transform text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>▼</span>
               </summary>
               <div className={`p-3 text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>
-                Our service optimizes your existing data connection. You need an active data plan to connect to our compression servers.
+                Go to the Plans section and select your preferred plan. You can activate welcome bonus, pay-as-you-go, or data plans based on your needs.
               </div>
             </details>
             
