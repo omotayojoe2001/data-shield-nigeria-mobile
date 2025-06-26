@@ -32,19 +32,7 @@ class PlanService {
         throw error;
       }
 
-      // If no active plan found, create welcome bonus plan for new users
-      if (!data) {
-        console.log('No active plan found, creating welcome bonus plan for new user');
-        
-        const created = await this.createWelcomeBonusPlan(user.id);
-        if (created) {
-          return await this.getCurrentPlan();
-        }
-        
-        return null;
-      }
-
-      return data as UserPlan;
+      return data as UserPlan || null;
     } catch (error) {
       console.error('Error fetching current plan:', error);
       return null;
@@ -55,39 +43,76 @@ class PlanService {
     try {
       console.log('Creating welcome bonus plan for user:', userId);
       
-      // First check if user already has any plan to avoid duplicates
+      // Check if user already has any active plan
       const { data: existingPlans } = await supabase
         .from('user_plans')
-        .select('id')
+        .select('id, plan_type, status')
         .eq('user_id', userId)
+        .eq('status', 'active')
         .limit(1);
 
       if (existingPlans && existingPlans.length > 0) {
-        console.log('User already has existing plans, not creating welcome bonus');
+        console.log('User already has an active plan:', existingPlans[0]);
         return false;
       }
       
-      const { error } = await supabase
+      // Create welcome bonus plan with proper plan_type
+      const { data: newPlan, error } = await supabase
         .from('user_plans')
         .insert({
           user_id: userId,
-          plan_type: 'welcome_bonus',
+          plan_type: 'data', // Use 'data' instead of 'welcome_bonus' due to constraint
           status: 'active',
           data_allocated: 0, // Start with 0, will be added through bonus claims
           data_used: 0,
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
-        });
+        })
+        .select()
+        .single();
 
       if (error) {
         console.error('Error creating welcome bonus plan:', error);
         return false;
       }
       
-      console.log('Welcome bonus plan created successfully');
+      console.log('Welcome bonus plan created successfully:', newPlan);
       return true;
     } catch (error) {
       console.error('Error creating welcome bonus plan:', error);
       return false;
+    }
+  }
+
+  async activateWelcomeBonus(): Promise<{ success: boolean; message: string }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { success: false, message: 'User not authenticated' };
+
+      // Check if user already has an active plan
+      const currentPlan = await this.getCurrentPlan();
+      if (currentPlan) {
+        return { success: false, message: 'You already have an active plan' };
+      }
+
+      // Check bonus eligibility
+      const bonusStatus = await bonusService.getBonusClaimStatus();
+      if (!bonusStatus || bonusStatus.days_claimed >= 7) {
+        return { success: false, message: 'Welcome bonus period has ended' };
+      }
+
+      // Create the welcome bonus plan
+      const success = await this.createWelcomeBonusPlan(user.id);
+      if (!success) {
+        return { success: false, message: 'Failed to activate welcome bonus' };
+      }
+
+      // Trigger UI updates
+      window.dispatchEvent(new CustomEvent('plan-updated'));
+      
+      return { success: true, message: 'Welcome bonus activated! Start claiming your daily 200MB.' };
+    } catch (error) {
+      console.error('Error activating welcome bonus:', error);
+      return { success: false, message: 'Failed to activate welcome bonus' };
     }
   }
 
@@ -140,7 +165,7 @@ class PlanService {
       };
 
       if (newPlanType === 'payg') {
-        newPlan.data_allocated = 0; // Unlimited for PAYG
+        newPlan.data_allocated = 0; // No limit for PAYG
       } else if (newPlanType === 'data') {
         // Restore previous data plan or use provided data
         if (preservedDataInfo && !dataMB) {
@@ -283,39 +308,20 @@ class PlanService {
 
       console.log(`Updating data usage: ${usageMB}MB for ${currentPlan.plan_type} plan`);
 
-      // For welcome bonus plan, data usage is tracked but data comes from bonus claims
-      if (currentPlan.plan_type === 'welcome_bonus') {
-        const newUsage = currentPlan.data_used + usageMB;
-        
-        console.log(`Welcome bonus plan: ${currentPlan.data_used}MB -> ${newUsage}MB (allocated: ${currentPlan.data_allocated}MB)`);
-        
-        await supabase
-          .from('user_plans')
-          .update({
-            data_used: newUsage,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', currentPlan.id);
+      const newUsage = currentPlan.data_used + usageMB;
+      
+      console.log(`${currentPlan.plan_type} plan: ${currentPlan.data_used}MB -> ${newUsage}MB`);
 
-        // Trigger UI updates
-        window.dispatchEvent(new CustomEvent('plan-updated'));
-      } else {
-        // For data and payg plans
-        const newUsage = currentPlan.data_used + usageMB;
+      await supabase
+        .from('user_plans')
+        .update({
+          data_used: newUsage,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentPlan.id);
 
-        console.log(`${currentPlan.plan_type} plan: ${currentPlan.data_used}MB -> ${newUsage}MB`);
-
-        await supabase
-          .from('user_plans')
-          .update({
-            data_used: newUsage,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', currentPlan.id);
-
-        // Trigger UI updates
-        window.dispatchEvent(new CustomEvent('plan-updated'));
-      }
+      // Trigger UI updates
+      window.dispatchEvent(new CustomEvent('plan-updated'));
 
       return true;
     } catch (error) {

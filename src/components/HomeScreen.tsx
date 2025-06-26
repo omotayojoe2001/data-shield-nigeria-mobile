@@ -19,6 +19,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   const [vpnStats, setVpnStats] = useState(vpnService.getStats());
   const [loading, setLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
+  const [activatingBonus, setActivatingBonus] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -61,6 +62,26 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
     }
   };
 
+  const handleActivateWelcomeBonus = async () => {
+    if (activatingBonus) return;
+
+    setActivatingBonus(true);
+    try {
+      const result = await planService.activateWelcomeBonus();
+      if (result.success) {
+        toast.success(result.message);
+        await loadPlanData();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error('Error activating welcome bonus:', error);
+      toast.error('Failed to activate welcome bonus');
+    } finally {
+      setActivatingBonus(false);
+    }
+  };
+
   const handleVPNToggle = async () => {
     if (loading) return;
     
@@ -74,23 +95,16 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         // Check if user can connect based on their plan
         const plan = await planService.getCurrentPlan();
         if (!plan) {
-          toast.error('No active plan found! Please claim your welcome bonus first.');
+          toast.error('No active plan found! Please activate your welcome bonus first.');
           return;
         }
         
-        if (plan.plan_type === 'welcome_bonus') {
-          const remainingData = Math.max(0, plan.data_allocated - plan.data_used);
-          if (remainingData <= 0) {
-            toast.error('Welcome bonus data exhausted! Please choose a plan to continue.');
-            onTabChange('plans');
-            return;
-          }
-        }
-        
+        // Check if it's a data plan and has remaining data
         if (plan.plan_type === 'data') {
           const remainingData = Math.max(0, plan.data_allocated - plan.data_used);
           if (remainingData <= 0) {
             toast.error('Data plan exhausted! Please buy more data or switch to Pay-As-You-Go.');
+            onTabChange('plans');
             return;
           }
         }
@@ -115,33 +129,36 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
   };
 
   const getPlanDisplayInfo = () => {
-    if (!currentPlan) return { name: 'No Plan', details: 'Claim your 7-day welcome bonus to get started!' };
+    if (!currentPlan) return { name: 'No Plan', details: 'Activate your 7-day welcome bonus to get started!' };
     
     switch (currentPlan.plan_type) {
-      case 'welcome_bonus':
+      case 'data':
         const remaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
         const expiryDate = currentPlan.expires_at ? new Date(currentPlan.expires_at) : null;
         const daysLeft = expiryDate ? Math.max(0, Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
-        return { 
-          name: 'Welcome Bonus Active', 
-          details: `${remaining}MB remaining (${daysLeft} days left)` 
-        };
+        
+        // Check if this is a welcome bonus plan (expires in 7 days or less and low data allocation)
+        const isWelcomeBonus = daysLeft <= 7 && currentPlan.data_allocated <= 1400; // 7 days * 200MB = 1400MB max
+        
+        if (isWelcomeBonus) {
+          return { 
+            name: 'Welcome Bonus Active', 
+            details: `${remaining}MB remaining (${daysLeft} days left)` 
+          };
+        } else {
+          const dataRemainingDisplay = remaining >= 1000 ? `${(remaining / 1000).toFixed(1)}GB` : `${remaining}MB`;
+          return { 
+            name: 'Data Plan', 
+            details: `${dataRemainingDisplay} remaining (${daysLeft} days left)` 
+          };
+        }
       case 'payg':
         return { 
           name: 'Pay-As-You-Go', 
           details: `₦${((wallet?.balance || 0) / 100).toFixed(2)} balance remaining` 
         };
-      case 'data':
-        const dataRemaining = Math.max(0, currentPlan.data_allocated - currentPlan.data_used);
-        const dataRemainingDisplay = dataRemaining >= 1000 ? `${(dataRemaining / 1000).toFixed(1)}GB` : `${dataRemaining}MB`;
-        const dataExpiryDate = currentPlan.expires_at ? new Date(currentPlan.expires_at) : null;
-        const dataDaysLeft = dataExpiryDate ? Math.max(0, Math.ceil((dataExpiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
-        return { 
-          name: 'Data Plan', 
-          details: `${dataRemainingDisplay} remaining (${dataDaysLeft} days left)` 
-        };
       default:
-        return { name: 'No Plan', details: 'Claim your 7-day welcome bonus to get started!' };
+        return { name: 'No Plan', details: 'Activate your 7-day welcome bonus to get started!' };
     }
   };
 
@@ -166,13 +183,26 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         </div>
 
         {/* Welcome Bonus Alert - Mobile Optimized */}
-        {(!currentPlan || currentPlan.plan_type === 'welcome_bonus') && (
-          <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-3 mb-4 border border-white/20">
+        {!currentPlan && (
+          <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-4 mb-4 border border-white/20">
             <div className="text-center">
-              <h3 className="text-white font-bold text-base mb-1">🎁 7-Day Welcome Bonus</h3>
-              <p className="text-white/90 text-xs mb-2">Get 200MB FREE daily for 7 days!</p>
-              <DailyBonusSection compact={true} />
+              <h3 className="text-white font-bold text-base mb-2">🎁 7-Day Welcome Bonus</h3>
+              <p className="text-white/90 text-sm mb-3">Get 200MB FREE daily for 7 days!</p>
+              <button
+                onClick={handleActivateWelcomeBonus}
+                disabled={activatingBonus}
+                className="w-full py-2 bg-white/20 backdrop-blur-sm rounded-xl text-white text-sm font-semibold hover:bg-white/30 transition-all duration-300 disabled:opacity-50"
+              >
+                {activatingBonus ? 'Activating...' : 'Activate Now'}
+              </button>
             </div>
+          </div>
+        )}
+
+        {/* Daily Bonus for existing plans */}
+        {currentPlan && (
+          <div className="mb-4">
+            <DailyBonusSection compact={true} />
           </div>
         )}
 
@@ -242,28 +272,10 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         </div>
       </div>
 
-      {/* Daily Bonus Section - Mobile Optimized */}
-      {currentPlan?.plan_type === 'welcome_bonus' && (
+      {/* Daily Bonus Section - Full version for existing plans */}
+      {currentPlan && (
         <div className="px-4 mt-4">
           <DailyBonusSection />
-        </div>
-      )}
-
-      {/* No Plan Warning - Mobile Optimized */}
-      {!currentPlan && (
-        <div className="px-4 mt-4">
-          <div className={`rounded-2xl p-4 shadow-lg border-2 border-purple-500 ${theme === 'dark' ? 'bg-gray-800' : 'bg-purple-50'}`}>
-            <div className="text-center">
-              <div className="text-3xl mb-2">🎁</div>
-              <h3 className={`text-base font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-purple-900'}`}>
-                Welcome to GoodDeeds Data!
-              </h3>
-              <p className={`mb-3 text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-purple-700'}`}>
-                Start your journey with our 7-day welcome bonus! Get 200MB FREE daily for your first week.
-              </p>
-              <DailyBonusSection />
-            </div>
-          </div>
         </div>
       )}
 
