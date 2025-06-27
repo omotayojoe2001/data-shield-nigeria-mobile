@@ -14,6 +14,13 @@ interface ClaimResult {
   bonusMB?: number;
 }
 
+interface BonusClaimStatus {
+  is_eligible: boolean;
+  days_claimed: number;
+  can_claim_today: boolean;
+  next_claim_time?: string;
+}
+
 class BonusService {
   async getBonusInfo(): Promise<BonusInfo> {
     try {
@@ -71,6 +78,34 @@ class BonusService {
     }
   }
 
+  async getBonusClaimStatus(): Promise<BonusClaimStatus | null> {
+    try {
+      // For now, simulate the bonus claim status
+      // In a real implementation, this would come from the backend
+      const daysClaimed = parseInt(localStorage.getItem('bonusDaysClaimed') || '0');
+      const lastClaim = localStorage.getItem('lastBonusClaim');
+      
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const canClaimToday = !lastClaim || new Date(lastClaim) < todayStart;
+      
+      let nextClaimTime: string | undefined;
+      if (!canClaimToday && lastClaim) {
+        nextClaimTime = new Date(new Date(lastClaim).getTime() + 24 * 60 * 60 * 1000).toISOString();
+      }
+
+      return {
+        is_eligible: daysClaimed < 7,
+        days_claimed: daysClaimed,
+        can_claim_today: canClaimToday && daysClaimed < 7,
+        next_claim_time: nextClaimTime
+      };
+    } catch (error) {
+      console.error('Error getting bonus claim status:', error);
+      return null;
+    }
+  }
+
   async claimDailyBonus(): Promise<ClaimResult> {
     try {
       const response = await apiService.claimDailyBonus();
@@ -109,4 +144,4 @@ class BonusService {
 }
 
 export const bonusService = new BonusService();
-export type { BonusInfo, ClaimResult };
+export type { BonusInfo, ClaimResult, BonusClaimStatus };
