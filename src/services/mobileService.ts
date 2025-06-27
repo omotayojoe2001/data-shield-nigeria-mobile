@@ -1,7 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Network } from '@capacitor/network';
-import { BackgroundTask } from '@capacitor/background-task';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
@@ -19,6 +18,7 @@ interface BackgroundTaskInfo {
 class MobileService {
   private backgroundTaskId: string | null = null;
   private networkListener: any = null;
+  private backgroundInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     this.initializeMobile();
@@ -121,26 +121,26 @@ class MobileService {
     }
 
     try {
-      const taskId = await BackgroundTask.beforeExit(async () => {
-        console.log('Background task started for VPN maintenance');
-        
-        // Keep VPN connection alive and track usage
-        const maintainVPN = setInterval(async () => {
-          try {
-            // Check VPN status and maintain connection
-            window.dispatchEvent(new CustomEvent('background-vpn-check'));
-          } catch (error) {
-            console.error('Background VPN check failed:', error);
-          }
-        }, 30000); // Every 30 seconds
+      // Generate a unique task ID
+      const taskId = `background-task-${Date.now()}`;
+      
+      console.log('Background task started for VPN maintenance');
+      
+      // Keep VPN connection alive and track usage
+      this.backgroundInterval = setInterval(async () => {
+        try {
+          // Check VPN status and maintain connection
+          window.dispatchEvent(new CustomEvent('background-vpn-check'));
+        } catch (error) {
+          console.error('Background VPN check failed:', error);
+        }
+      }, 30000); // Every 30 seconds
 
-        // Clean up after 5 minutes (iOS background limit)
-        setTimeout(() => {
-          clearInterval(maintainVPN);
-          BackgroundTask.finish({ taskId });
-          console.log('Background task finished');
-        }, 5 * 60 * 1000);
-      });
+      // Clean up after 5 minutes (iOS/Android background limit)
+      setTimeout(() => {
+        this.stopBackgroundTask();
+        console.log('Background task finished');
+      }, 5 * 60 * 1000);
 
       this.backgroundTaskId = taskId;
       return {
@@ -154,15 +154,13 @@ class MobileService {
   }
 
   async stopBackgroundTask(): Promise<void> {
-    if (!this.backgroundTaskId) return;
-
-    try {
-      await BackgroundTask.finish({ taskId: this.backgroundTaskId });
-      this.backgroundTaskId = null;
-      console.log('Background task stopped');
-    } catch (error) {
-      console.error('Error stopping background task:', error);
+    if (this.backgroundInterval) {
+      clearInterval(this.backgroundInterval);
+      this.backgroundInterval = null;
     }
+    
+    this.backgroundTaskId = null;
+    console.log('Background task stopped');
   }
 
   async triggerHaptic(style: 'light' | 'medium' | 'heavy' = 'light'): Promise<void> {
@@ -201,9 +199,10 @@ class MobileService {
     if (this.networkListener) {
       this.networkListener.remove();
     }
-    if (this.backgroundTaskId) {
-      this.stopBackgroundTask();
+    if (this.backgroundInterval) {
+      clearInterval(this.backgroundInterval);
     }
+    this.backgroundTaskId = null;
   }
 }
 
