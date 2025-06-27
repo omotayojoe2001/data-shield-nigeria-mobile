@@ -240,6 +240,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
       console.log('Starting signup process for:', email);
+      console.log('Window origin:', window.location.origin);
       
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -253,15 +254,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       console.log('Signup response:', { data, error });
+      console.log('User created:', data.user?.id);
+      console.log('Session created:', !!data.session);
+      console.log('Email confirmation sent at:', data.user?.confirmation_sent_at);
       
       if (error) {
         console.error('Signup error:', error);
         return { error };
       }
       
-      // If user needs to confirm email
+      // Check if user was created but needs email confirmation
       if (data.user && !data.session) {
-        console.log('User created, email confirmation required');
+        console.log('User created successfully, email confirmation required');
+        console.log('Confirmation sent at:', data.user.confirmation_sent_at);
+        
+        // Check if confirmation was actually sent
+        if (data.user.confirmation_sent_at) {
+          console.log('Email confirmation was sent successfully');
+          return { error: null };
+        } else {
+          console.warn('User created but no confirmation email sent');
+          return { 
+            error: { 
+              message: 'Account created but verification email was not sent. Please contact support.' 
+            } 
+          };
+        }
+      }
+      
+      // If session exists, user is automatically confirmed
+      if (data.user && data.session) {
+        console.log('User created and automatically signed in (email confirmation disabled)');
         return { error: null };
       }
       

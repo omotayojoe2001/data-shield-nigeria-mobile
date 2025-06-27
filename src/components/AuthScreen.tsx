@@ -42,23 +42,23 @@ const AuthScreen = ({ onComplete }: AuthScreenProps) => {
         if (error) {
           setError(error.message || 'Failed to create account');
         } else {
-          setMessage('Account created successfully! Please check your email to verify your account before signing in.');
+          setMessage('Account created successfully! Please check your email (including spam folder) to verify your account. The verification link may take a few minutes to arrive.');
           // Clear form
           setEmail('');
           setPassword('');
           setFullName('');
-          // Switch to signin mode after a delay
+          // Switch to signin mode after a longer delay to give user time to read
           setTimeout(() => {
             setMode('signin');
-            setMessage('');
-          }, 3000);
+            setMessage('Please sign in after verifying your email address.');
+          }, 5000);
         }
       } else if (mode === 'forgot') {
         const { error } = await resetPassword(email);
         if (error) {
           setError(error.message || 'Failed to send reset email');
         } else {
-          setMessage('Password reset email sent!');
+          setMessage('Password reset email sent! Please check your inbox and spam folder.');
         }
       }
     } catch (err) {
