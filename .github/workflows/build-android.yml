@@ -1,4 +1,5 @@
 
+
 name: Build Android APK
 
 on:
@@ -19,7 +20,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         cache: 'npm'
         
     - name: Setup Java
@@ -65,3 +66,4 @@ jobs:
         name: gooddeeds-vpn-release-ready
         path: android/app/build/outputs/apk/debug/app-debug.apk
         retention-days: 90
+
