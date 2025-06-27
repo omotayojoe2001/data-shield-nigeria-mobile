@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Wallet, CreditCard, History, Gift, Plus, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/integrations/supabase/client';
+import { apiService } from '@/services/apiService';
 import DailyBonusSection from './DailyBonusSection';
 import { toast } from 'sonner';
 
@@ -144,69 +144,31 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
     
     setLoading(true);
     try {
-      // Get current session to ensure user is authenticated
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !sessionData.session) {
-        toast.error('Please login again to continue');
-        setLoading(false);
-        return;
-      }
+      console.log('Processing payment for amount:', amount);
 
-      console.log('Initializing payment for user:', user.id, 'amount:', amount);
+      // Use the backend API to process payment
+      const response = await apiService.processPayment(amount);
 
-      // Store session data in BOTH sessionStorage AND localStorage for redundancy
-      const sessionBackup = {
-        access_token: sessionData.session.access_token,
-        refresh_token: sessionData.session.refresh_token,
-        user_id: user.id,
-        amount: amount,
-        timestamp: Date.now()
-      };
-      
-      sessionStorage.setItem('pre_payment_session', JSON.stringify(sessionBackup));
-      localStorage.setItem('pre_payment_session', JSON.stringify(sessionBackup));
-
-      const { data, error } = await supabase.functions.invoke('initialize-payment', {
-        body: {
-          amount: amount * 100, // Convert to kobo
-          email: user.email,
-          type: 'topup',
-          callback_url: `${window.location.origin}/?payment=success&amount=${amount}&user_id=${user.id}&timestamp=${Date.now()}`
-        },
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`
-        }
-      });
-
-      console.log('Payment initialization response:', { data, error });
-
-      if (error) {
-        console.error('Payment initialization error:', error);
-        throw error;
-      }
-
-      if (data?.authorization_url) {
-        console.log('Redirecting to Paystack:', data.authorization_url);
+      if (response.success && response.data?.paystackUrl) {
+        console.log('Opening Paystack URL:', response.data.paystackUrl);
         
-        // Store additional payment info
+        // Store payment info for tracking
         sessionStorage.setItem('paystack_payment_data', JSON.stringify({
-          reference: data.reference,
           amount: amount,
           user_id: user.id,
           timestamp: Date.now()
         }));
 
-        // Use window.location.href for redirect to maintain session
-        window.location.href = data.authorization_url;
+        // Open Paystack payment page in new tab
+        window.open(response.data.paystackUrl, '_blank');
+        
+        toast.success('Payment window opened. Complete your payment in the new tab.');
       } else {
-        throw new Error('No authorization URL received');
+        throw new Error(response.error || 'Failed to initialize payment');
       }
     } catch (error) {
       console.error('Payment initialization error:', error);
       toast.error('Failed to initialize payment. Please try again.');
-      // Clean up stored session data on error
-      sessionStorage.removeItem('pre_payment_session');
-      localStorage.removeItem('pre_payment_session');
     } finally {
       setLoading(false);
     }
