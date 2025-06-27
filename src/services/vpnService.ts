@@ -1,5 +1,5 @@
-
 import { apiService } from './apiService';
+import { mobileService } from './mobileService';
 
 interface VPNStats {
   isConnected: boolean;
@@ -52,10 +52,57 @@ class VPNService {
   constructor() {
     // Listen for forced disconnections
     window.addEventListener('vpn-force-disconnect', this.forceDisconnect.bind(this));
+    
+    // Listen for mobile events
+    window.addEventListener('app-resumed', this.handleAppResume.bind(this));
+    window.addEventListener('network-reconnected', this.handleNetworkReconnected.bind(this));
+    window.addEventListener('background-vpn-check', this.handleBackgroundCheck.bind(this));
+  }
+
+  private async handleAppResume() {
+    console.log('App resumed - checking VPN status');
+    if (this.stats.isConnected) {
+      // Refresh VPN status when app resumes
+      await this.refreshVpnStatus();
+    }
+  }
+
+  private async handleNetworkReconnected() {
+    console.log('Network reconnected - checking VPN');
+    if (this.stats.isConnected) {
+      // Try to reconnect VPN if it was connected
+      const result = await this.connect();
+      if (!result.success) {
+        console.error('Failed to reconnect VPN after network change');
+      }
+    }
+  }
+
+  private async handleBackgroundCheck() {
+    if (this.stats.isConnected) {
+      try {
+        // Lightweight VPN status check for background
+        const usageResponse = await apiService.trackUsage();
+        if (usageResponse.success && usageResponse.data) {
+          console.log('Background VPN check successful');
+        }
+      } catch (error) {
+        console.error('Background VPN check failed:', error);
+      }
+    }
   }
 
   async connect(): Promise<{ success: boolean; error?: string }> {
     try {
+      // Trigger haptic feedback on mobile
+      await mobileService.triggerHaptic('medium');
+      
+      // Check network connectivity first
+      const networkInfo = await mobileService.getNetworkInfo();
+      if (!networkInfo.connected) {
+        return { success: false, error: 'No network connection available' };
+      }
+
       // First, check if user has a VPN key
       const statusResponse = await apiService.getVpnStatus();
       if (!statusResponse.success) {
@@ -91,6 +138,11 @@ class VPNService {
       // Start usage tracking
       this.startUsageTracking();
       
+      // Start background task on mobile
+      if (mobileService.isNative()) {
+        await mobileService.startBackgroundTask();
+      }
+      
       console.log("VPN Connected successfully with backend key");
       return { success: true };
     } catch (error) {
@@ -100,6 +152,9 @@ class VPNService {
   }
 
   async disconnect(): Promise<boolean> {
+    // Trigger haptic feedback
+    await mobileService.triggerHaptic('light');
+    
     this.stats.isConnected = false;
     this.stats.downloadSpeed = 0;
     this.stats.uploadSpeed = 0;
@@ -109,8 +164,24 @@ class VPNService {
     // Stop usage tracking
     this.stopUsageTracking();
     
+    // Stop background task on mobile
+    if (mobileService.isNative()) {
+      await mobileService.stopBackgroundTask();
+    }
+    
     console.log("VPN Disconnected");
     return true;
+  }
+
+  private async refreshVpnStatus() {
+    try {
+      const statusResponse = await apiService.getVpnStatus();
+      if (statusResponse.success && statusResponse.data) {
+        this.lastVpnStatus = statusResponse.data;
+      }
+    } catch (error) {
+      console.error('Failed to refresh VPN status:', error);
+    }
   }
 
   private async forceDisconnect(): Promise<void> {
