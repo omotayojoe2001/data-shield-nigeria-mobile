@@ -42,7 +42,16 @@ const AuthScreen = ({ onComplete }: AuthScreenProps) => {
         if (error) {
           setError(error.message || 'Failed to create account');
         } else {
-          setMessage('Check your email for verification link!');
+          setMessage('Account created successfully! Please check your email to verify your account before signing in.');
+          // Clear form
+          setEmail('');
+          setPassword('');
+          setFullName('');
+          // Switch to signin mode after a delay
+          setTimeout(() => {
+            setMode('signin');
+            setMessage('');
+          }, 3000);
         }
       } else if (mode === 'forgot') {
         const { error } = await resetPassword(email);

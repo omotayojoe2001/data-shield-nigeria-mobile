@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -238,19 +239,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
+      console.log('Starting signup process for:', email);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { full_name: fullName },
+          data: { 
+            full_name: fullName 
+          },
           emailRedirectTo: `${window.location.origin}/`
         }
       });
       
       console.log('Signup response:', { data, error });
-      return { error };
+      
+      if (error) {
+        console.error('Signup error:', error);
+        return { error };
+      }
+      
+      // If user needs to confirm email
+      if (data.user && !data.session) {
+        console.log('User created, email confirmation required');
+        return { error: null };
+      }
+      
+      return { error: null };
     } catch (error) {
-      console.error('Signup error:', error);
+      console.error('Signup exception:', error);
       return { error };
     }
   };
