@@ -1,5 +1,4 @@
 
-
 name: Build Android APK
 
 on:
@@ -17,7 +16,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Setup Node.js
+    - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20'
@@ -38,10 +37,13 @@ jobs:
     - name: Build web app
       run: npm run build
       
-    - name: Add Android platform (only if not already there)
+    - name: Add Android platform if not already added
       run: |
         if [ ! -d "android" ]; then
           npx cap add android
+          echo "Android platform added"
+        else
+          echo "Android platform already exists"
         fi
       
     - name: Sync Capacitor
@@ -69,4 +71,3 @@ jobs:
         name: gooddeeds-vpn-release-ready
         path: android/app/build/outputs/apk/debug/app-debug.apk
         retention-days: 90
-
