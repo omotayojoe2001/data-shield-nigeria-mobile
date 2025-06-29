@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
@@ -11,17 +10,15 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { vpnService } from '../services/vpnService';
 import { planService } from '../services/planService';
 import { bonusService } from '../services/bonusService';
 
-interface HomeScreenProps {
-  onTabChange: (tab: string) => void;
-}
-
-const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
+const HomeScreen = () => {
+  const navigation = useNavigation();
   const { user, profile, wallet } = useAuth();
   const { theme } = useTheme();
   const [vpnStats, setVpnStats] = useState(vpnService.getStats());
@@ -124,12 +121,6 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
                 {vpnStats.isConnected ? 'Your connection is secure' : 'Tap to connect securely'}
               </Text>
             </View>
-            <TouchableOpacity 
-              style={styles.settingsButton}
-              onPress={() => onTabChange('settings')}
-            >
-              <Ionicons name="settings" size={24} color="#ffffff" />
-            </TouchableOpacity>
           </View>
         </LinearGradient>
 
@@ -194,10 +185,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
 
         {/* Current Plan */}
         {currentPlan && (
-          <TouchableOpacity 
-            style={styles.planCard}
-            onPress={() => onTabChange('current-plan')}
-          >
+          <TouchableOpacity style={styles.planCard}>
             <View style={styles.planHeader}>
               <Text style={styles.planTitle}>Current Plan</Text>
               <Ionicons name="chevron-forward" size={20} color="#6b7280" />
@@ -224,7 +212,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         {/* Wallet Balance */}
         <TouchableOpacity 
           style={styles.walletCard}
-          onPress={() => onTabChange('wallet')}
+          onPress={() => navigation.navigate('Wallet' as never)}
         >
           <View style={styles.walletHeader}>
             <Ionicons name="wallet" size={24} color="#10b981" />
@@ -239,7 +227,7 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         {bonusInfo?.canClaim && (
           <TouchableOpacity 
             style={styles.bonusCard}
-            onPress={() => onTabChange('plans')}
+            onPress={() => navigation.navigate('Plans' as never)}
           >
             <LinearGradient
               colors={['#f59e0b', '#d97706']}
@@ -262,31 +250,24 @@ const HomeScreen = ({ onTabChange }: HomeScreenProps) => {
         <View style={styles.actionsContainer}>
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => onTabChange('plans')}
+            onPress={() => navigation.navigate('Plans' as never)}
           >
             <Ionicons name="list" size={24} color="#3b82f6" />
             <Text style={styles.actionText}>Plans</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => onTabChange('usage')}
+            onPress={() => navigation.navigate('Usage' as never)}
           >
             <Ionicons name="analytics" size={24} color="#10b981" />
             <Text style={styles.actionText}>Usage</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => onTabChange('referral')}
+            onPress={() => navigation.navigate('Profile' as never)}
           >
-            <Ionicons name="people" size={24} color="#f59e0b" />
-            <Text style={styles.actionText}>Referral</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => onTabChange('support')}
-          >
-            <Ionicons name="help-circle" size={24} color="#8b5cf6" />
-            <Text style={styles.actionText}>Support</Text>
+            <Ionicons name="person" size={24} color="#8b5cf6" />
+            <Text style={styles.actionText}>Profile</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -322,9 +303,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#bfdbfe',
     marginTop: 4,
-  },
-  settingsButton: {
-    padding: 8,
   },
   vpnCard: {
     backgroundColor: '#ffffff',

@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -7,6 +9,8 @@ import SplashScreen from '../screens/SplashScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import AuthScreen from '../screens/AuthScreen';
 import TabNavigator from './TabNavigator';
+
+const Stack = createNativeStackNavigator();
 
 const MainNavigator = () => {
   const { user, profile, loading, isFirstTime, setIsFirstTime } = useAuth();
@@ -36,15 +40,23 @@ const MainNavigator = () => {
     );
   }
 
-  if (!user) {
-    return <AuthScreen onComplete={() => setIsFirstTime(false)} />;
-  }
-
-  if (isFirstTime && profile) {
-    return <OnboardingScreen onComplete={() => setIsFirstTime(false)} />;
-  }
-
-  return <TabNavigator />;
+  return (
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {!user ? (
+          <Stack.Screen name="Auth">
+            {() => <AuthScreen onComplete={() => setIsFirstTime(false)} />}
+          </Stack.Screen>
+        ) : isFirstTime && profile ? (
+          <Stack.Screen name="Onboarding">
+            {() => <OnboardingScreen onComplete={() => setIsFirstTime(false)} />}
+          </Stack.Screen>
+        ) : (
+          <Stack.Screen name="Main" component={TabNavigator} />
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
 };
 
 const styles = StyleSheet.create({

@@ -1,9 +1,9 @@
 
-const { getDefaultConfig } = require('expo/metro-config');
+import { getDefaultConfig } from 'expo/metro-config';
 
-const config = getDefaultConfig(__dirname);
+const config = getDefaultConfig(import.meta.dirname || process.cwd());
 
 // Add support for additional file extensions
 config.resolver.assetExts.push('db', 'mp3', 'ttf', 'obj', 'png', 'jpg');
 
-module.exports = config;
+export default config;
