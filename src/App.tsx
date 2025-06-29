@@ -7,7 +7,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { useEffect } from "react";
-import { mobileService } from "@/services/mobileService";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
@@ -15,15 +14,10 @@ const queryClient = new QueryClient();
 
 const App = () => {
   useEffect(() => {
-    // Initialize mobile services
-    console.log('Initializing mobile app...');
-    console.log('Platform:', mobileService.getPlatform());
-    console.log('Is native:', mobileService.isNative());
-    
-    // Cleanup on unmount
-    return () => {
-      mobileService.cleanup();
-    };
+    // Initialize web app
+    console.log('Initializing web app...');
+    console.log('Platform: web');
+    console.log('Is native: false');
   }, []);
 
   return (

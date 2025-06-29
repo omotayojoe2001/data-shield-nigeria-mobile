@@ -1,7 +1,25 @@
-import { Platform } from 'react-native';
-import * as Network from 'expo-network';
-import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Platform detection
+const isReactNative = typeof navigator !== 'undefined' && navigator.product === 'ReactNative';
+const isExpo = typeof global !== 'undefined' && global.__expo;
+const isWeb = typeof window !== 'undefined' && !isReactNative;
+
+// Conditionally import React Native modules only when in RN environment
+let Platform: any = null;
+let Network: any = null;
+let Haptics: any = null;
+let AsyncStorage: any = null;
+
+if (isReactNative || isExpo) {
+  try {
+    Platform = require('react-native').Platform;
+    Network = require('expo-network');
+    Haptics = require('expo-haptics');
+    AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  } catch (e) {
+    console.warn('React Native modules not available:', e);
+  }
+}
 
 interface NetworkInfo {
   connected: boolean;
@@ -25,10 +43,13 @@ class MobileService {
 
   private async initializeMobile() {
     try {
-      console.log('Mobile service initialized for React Native');
-      
-      // Set up network monitoring
-      this.setupNetworkMonitoring();
+      if (isReactNative || isExpo) {
+        console.log('Mobile service initialized for React Native');
+        this.setupNetworkMonitoring();
+      } else {
+        console.log('Mobile service initialized for Web');
+        this.setupWebNetworkMonitoring();
+      }
       
       console.log('Mobile service initialized successfully');
     } catch (error) {
@@ -37,6 +58,8 @@ class MobileService {
   }
 
   private setupNetworkMonitoring() {
+    if (!Network) return;
+    
     // Monitor network state changes
     this.networkListener = setInterval(async () => {
       try {
@@ -57,31 +80,40 @@ class MobileService {
     }, 5000);
   }
 
-  private handleAppResume() {
-    console.log('App resumed - checking VPN status');
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('app-resumed'));
-    }
-  }
-
-  private handleAppPause() {
-    console.log('App paused - starting background task');
-    this.startBackgroundTask();
-  }
-
-  private handleNetworkReconnection() {
-    console.log('Network reconnected - checking VPN');
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('network-reconnected'));
+  private setupWebNetworkMonitoring() {
+    // Web-based network monitoring
+    if (typeof window !== 'undefined' && 'navigator' in window) {
+      this.networkListener = setInterval(() => {
+        const connected = navigator.onLine;
+        window.dispatchEvent(new CustomEvent('mobile-network-change', {
+          detail: {
+            connected,
+            connectionType: connected ? 'wifi' : 'none'
+          }
+        }));
+      }, 5000);
     }
   }
 
   async getNetworkInfo(): Promise<NetworkInfo> {
     try {
-      const networkState = await Network.getNetworkStateAsync();
+      if (Network) {
+        const networkState = await Network.getNetworkStateAsync();
+        return {
+          connected: networkState.isConnected || false,
+          connectionType: networkState.type || 'unknown'
+        };
+      } else if (typeof navigator !== 'undefined') {
+        // Web fallback
+        return {
+          connected: navigator.onLine,
+          connectionType: navigator.onLine ? 'wifi' : 'none'
+        };
+      }
+      
       return {
-        connected: networkState.isConnected || false,
-        connectionType: networkState.type || 'unknown'
+        connected: false,
+        connectionType: 'none'
       };
     } catch (error) {
       console.error('Error getting network info:', error);
@@ -138,33 +170,47 @@ class MobileService {
 
   async triggerHaptic(style: 'light' | 'medium' | 'heavy' = 'light'): Promise<void> {
     try {
-      const impactStyle = style === 'light' ? Haptics.ImpactFeedbackStyle.Light : 
-                        style === 'medium' ? Haptics.ImpactFeedbackStyle.Medium : 
-                        Haptics.ImpactFeedbackStyle.Heavy;
-      
-      await Haptics.impactAsync(impactStyle);
+      if (Haptics) {
+        const impactStyle = style === 'light' ? Haptics.ImpactFeedbackStyle.Light : 
+                          style === 'medium' ? Haptics.ImpactFeedbackStyle.Medium : 
+                          Haptics.ImpactFeedbackStyle.Heavy;
+        
+        await Haptics.impactAsync(impactStyle);
+      } else {
+        // Web fallback - vibrate API
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          const duration = style === 'light' ? 50 : style === 'medium' ? 100 : 200;
+          navigator.vibrate(duration);
+        }
+      }
     } catch (error) {
       console.error('Error triggering haptic:', error);
     }
   }
 
   async exitApp(): Promise<void> {
-    // Not applicable in React Native/Expo
-    console.log('Exit app not supported in React Native');
+    console.log('Exit app not supported in React Native/Web');
   }
 
   isNative(): boolean {
-    return Platform.OS === 'ios' || Platform.OS === 'android';
+    return isReactNative || isExpo;
   }
 
   getPlatform(): string {
-    return Platform.OS;
+    if (Platform) {
+      return Platform.OS;
+    }
+    return isWeb ? 'web' : 'unknown';
   }
 
-  // Storage utilities using AsyncStorage
+  // Storage utilities
   async setItem(key: string, value: string): Promise<void> {
     try {
-      await AsyncStorage.setItem(key, value);
+      if (AsyncStorage) {
+        await AsyncStorage.setItem(key, value);
+      } else if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(key, value);
+      }
     } catch (error) {
       console.error('Error setting item:', error);
     }
@@ -172,7 +218,12 @@ class MobileService {
 
   async getItem(key: string): Promise<string | null> {
     try {
-      return await AsyncStorage.getItem(key);
+      if (AsyncStorage) {
+        return await AsyncStorage.getItem(key);
+      } else if (typeof localStorage !== 'undefined') {
+        return localStorage.getItem(key);
+      }
+      return null;
     } catch (error) {
       console.error('Error getting item:', error);
       return null;
@@ -181,7 +232,11 @@ class MobileService {
 
   async removeItem(key: string): Promise<void> {
     try {
-      await AsyncStorage.removeItem(key);
+      if (AsyncStorage) {
+        await AsyncStorage.removeItem(key);
+      } else if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(key);
+      }
     } catch (error) {
       console.error('Error removing item:', error);
     }
