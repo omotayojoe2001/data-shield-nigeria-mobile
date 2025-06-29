@@ -1,8 +1,7 @@
-import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
-import { Network } from '@capacitor/network';
-import { StatusBar, Style } from '@capacitor/status-bar';
-import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { Platform } from 'react-native';
+import * as Network from 'expo-network';
+import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface NetworkInfo {
   connected: boolean;
@@ -25,25 +24,9 @@ class MobileService {
   }
 
   private async initializeMobile() {
-    if (!Capacitor.isNativePlatform()) {
-      console.log('Running in web mode - native features disabled');
-      return;
-    }
-
     try {
-      // Set up status bar
-      await StatusBar.setStyle({ style: Style.Dark });
+      console.log('Mobile service initialized for React Native');
       
-      // Set up app state listeners
-      App.addListener('appStateChange', ({ isActive }) => {
-        console.log('App state changed. Is active:', isActive);
-        if (isActive) {
-          this.handleAppResume();
-        } else {
-          this.handleAppPause();
-        }
-      });
-
       // Set up network monitoring
       this.setupNetworkMonitoring();
       
@@ -54,30 +37,31 @@ class MobileService {
   }
 
   private setupNetworkMonitoring() {
-    if (!Capacitor.isNativePlatform()) return;
-
-    this.networkListener = Network.addListener('networkStatusChange', (status) => {
-      console.log('Network status changed:', status);
-      
-      // Dispatch custom event for network changes
-      window.dispatchEvent(new CustomEvent('mobile-network-change', {
-        detail: {
-          connected: status.connected,
-          connectionType: status.connectionType
+    // Monitor network state changes
+    this.networkListener = setInterval(async () => {
+      try {
+        const networkState = await Network.getNetworkStateAsync();
+        
+        // Dispatch custom event for network changes
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('mobile-network-change', {
+            detail: {
+              connected: networkState.isConnected,
+              connectionType: networkState.type
+            }
+          }));
         }
-      }));
-      
-      // Handle VPN reconnection if needed
-      if (status.connected) {
-        this.handleNetworkReconnection();
+      } catch (error) {
+        console.error('Network monitoring error:', error);
       }
-    });
+    }, 5000);
   }
 
   private handleAppResume() {
     console.log('App resumed - checking VPN status');
-    // Trigger VPN status check
-    window.dispatchEvent(new CustomEvent('app-resumed'));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('app-resumed'));
+    }
   }
 
   private handleAppPause() {
@@ -87,23 +71,17 @@ class MobileService {
 
   private handleNetworkReconnection() {
     console.log('Network reconnected - checking VPN');
-    // Trigger VPN reconnection check
-    window.dispatchEvent(new CustomEvent('network-reconnected'));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('network-reconnected'));
+    }
   }
 
   async getNetworkInfo(): Promise<NetworkInfo> {
-    if (!Capacitor.isNativePlatform()) {
-      return {
-        connected: navigator.onLine,
-        connectionType: 'wifi'
-      };
-    }
-
     try {
-      const status = await Network.getStatus();
+      const networkState = await Network.getNetworkStateAsync();
       return {
-        connected: status.connected,
-        connectionType: status.connectionType
+        connected: networkState.isConnected || false,
+        connectionType: networkState.type || 'unknown'
       };
     } catch (error) {
       console.error('Error getting network info:', error);
@@ -115,13 +93,7 @@ class MobileService {
   }
 
   async startBackgroundTask(): Promise<BackgroundTaskInfo | null> {
-    if (!Capacitor.isNativePlatform()) {
-      console.log('Background tasks not available in web mode');
-      return null;
-    }
-
     try {
-      // Generate a unique task ID
       const taskId = `background-task-${Date.now()}`;
       
       console.log('Background task started for VPN maintenance');
@@ -129,14 +101,15 @@ class MobileService {
       // Keep VPN connection alive and track usage
       this.backgroundInterval = setInterval(async () => {
         try {
-          // Check VPN status and maintain connection
-          window.dispatchEvent(new CustomEvent('background-vpn-check'));
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('background-vpn-check'));
+          }
         } catch (error) {
           console.error('Background VPN check failed:', error);
         }
-      }, 30000); // Every 30 seconds
+      }, 30000);
 
-      // Clean up after 5 minutes (iOS/Android background limit)
+      // Clean up after 5 minutes
       setTimeout(() => {
         this.stopBackgroundTask();
         console.log('Background task finished');
@@ -164,40 +137,59 @@ class MobileService {
   }
 
   async triggerHaptic(style: 'light' | 'medium' | 'heavy' = 'light'): Promise<void> {
-    if (!Capacitor.isNativePlatform()) return;
-
     try {
-      const impactStyle = style === 'light' ? ImpactStyle.Light : 
-                        style === 'medium' ? ImpactStyle.Medium : 
-                        ImpactStyle.Heavy;
+      const impactStyle = style === 'light' ? Haptics.ImpactFeedbackStyle.Light : 
+                        style === 'medium' ? Haptics.ImpactFeedbackStyle.Medium : 
+                        Haptics.ImpactFeedbackStyle.Heavy;
       
-      await Haptics.impact({ style: impactStyle });
+      await Haptics.impactAsync(impactStyle);
     } catch (error) {
       console.error('Error triggering haptic:', error);
     }
   }
 
   async exitApp(): Promise<void> {
-    if (!Capacitor.isNativePlatform()) return;
-
-    try {
-      await App.exitApp();
-    } catch (error) {
-      console.error('Error exiting app:', error);
-    }
+    // Not applicable in React Native/Expo
+    console.log('Exit app not supported in React Native');
   }
 
   isNative(): boolean {
-    return Capacitor.isNativePlatform();
+    return Platform.OS === 'ios' || Platform.OS === 'android';
   }
 
   getPlatform(): string {
-    return Capacitor.getPlatform();
+    return Platform.OS;
+  }
+
+  // Storage utilities using AsyncStorage
+  async setItem(key: string, value: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem(key, value);
+    } catch (error) {
+      console.error('Error setting item:', error);
+    }
+  }
+
+  async getItem(key: string): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem(key);
+    } catch (error) {
+      console.error('Error getting item:', error);
+      return null;
+    }
+  }
+
+  async removeItem(key: string): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(key);
+    } catch (error) {
+      console.error('Error removing item:', error);
+    }
   }
 
   cleanup() {
     if (this.networkListener) {
-      this.networkListener.remove();
+      clearInterval(this.networkListener);
     }
     if (this.backgroundInterval) {
       clearInterval(this.backgroundInterval);
