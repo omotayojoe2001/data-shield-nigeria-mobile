@@ -2,7 +2,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Shield, Zap, TrendingDown } from 'lucide-react';
 
 interface OnboardingScreenProps {
   onComplete: () => void;
@@ -26,15 +26,15 @@ const OnboardingScreen = ({ onComplete }: OnboardingScreenProps) => {
           
           <View style={styles.features}>
             <View style={styles.feature}>
-              <Ionicons name="shield-checkmark" size={24} color="#10b981" />
+              <Shield size={24} color="#10b981" />
               <Text style={styles.featureText}>Secure & Private</Text>
             </View>
             <View style={styles.feature}>
-              <Ionicons name="flash" size={24} color="#f59e0b" />
+              <Zap size={24} color="#f59e0b" />
               <Text style={styles.featureText}>Fast Connection</Text>
             </View>
             <View style={styles.feature}>
-              <Ionicons name="trending-down" size={24} color="#3b82f6" />
+              <TrendingDown size={24} color="#3b82f6" />
               <Text style={styles.featureText}>Data Savings</Text>
             </View>
           </View>
