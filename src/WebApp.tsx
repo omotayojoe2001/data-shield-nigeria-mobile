@@ -8,6 +8,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import HomePage from './pages/HomePage';
 import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
+import WalletPage from './pages/WalletPage';
+import ProfilePage from './pages/ProfilePage';
+import PlansPage from './pages/PlansPage';
+import DebugTest from './components/DebugTest';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,6 +23,8 @@ const queryClient = new QueryClient({
 });
 
 const WebApp = () => {
+  console.log('WebApp rendering');
+  
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
@@ -29,6 +35,10 @@ const WebApp = () => {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/wallet" element={<WalletPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/plans" element={<PlansPage />} />
+                <Route path="/debug" element={<DebugTest />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
               <Toaster />
