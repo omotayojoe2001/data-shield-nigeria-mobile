@@ -49,8 +49,8 @@ const HomePage = () => {
               Start Free Trial
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate('/plans')}>
-              View Plans
+            <Button size="lg" variant="outline" onClick={() => navigate('/dashboard')}>
+              View Dashboard
             </Button>
           </div>
         </div>
