@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 // React Native Web Shim - provides empty implementations for web
@@ -93,6 +94,7 @@ export const Text = 'span';
 export const TouchableOpacity = 'button';
 export const ScrollView = 'div';
 export const SafeAreaView = 'div';
+export const KeyboardAvoidingView = 'div';
 
 export const ActivityIndicator: React.FC<{ size?: string; color?: string }> = ({ 
   size = 'small', 
@@ -193,6 +195,7 @@ export default {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
+  KeyboardAvoidingView,
   ActivityIndicator,
   LinearGradient,
   SafeAreaProvider,
