@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 // React Native Web Shim - provides empty implementations for web
@@ -15,6 +16,12 @@ export const Dimensions = {
 
 export const StyleSheet = {
   create: (styles: any) => styles,
+};
+
+// PixelRatio shim for expo-asset
+export const PixelRatio = {
+  get: () => typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
+  getPixelSizeForLayoutSize: (layoutSize: number) => Math.round(layoutSize * (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)),
 };
 
 // NativeModules shim for expo-modules-core
@@ -127,6 +134,7 @@ export default {
   Platform,
   Dimensions,
   StyleSheet,
+  PixelRatio,
   NativeModules,
   NativeEventEmitter,
   View,
