@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Gift, Clock, CheckCircle } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -41,7 +40,7 @@ const DailyBonusSection = ({ compact = false }: DailyBonusSectionProps) => {
 
   // Countdown timer effect
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     
     if (bonusInfo.nextClaimTime && !bonusInfo.canClaim) {
       interval = setInterval(() => {

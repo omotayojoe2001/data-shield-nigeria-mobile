@@ -1,4 +1,3 @@
-
 // Platform detection
 const isReactNative = typeof navigator !== 'undefined' && navigator.product === 'ReactNative';
 const isExpo = typeof global !== 'undefined' && global.__expo;
@@ -34,8 +33,8 @@ interface BackgroundTaskInfo {
 
 class MobileService {
   private backgroundTaskId: string | null = null;
-  private networkListener: any = null;
-  private backgroundInterval: NodeJS.Timeout | null = null;
+  private networkListener: ReturnType<typeof setInterval> | null = null;
+  private backgroundInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.initializeMobile();

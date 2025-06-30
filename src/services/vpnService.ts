@@ -46,7 +46,7 @@ class VPNService {
     hasVpnKey: false
   };
 
-  private usageTrackingInterval?: NodeJS.Timeout;
+  private usageTrackingInterval?: ReturnType<typeof setInterval>;
   private lastVpnStatus: VpnStatusData | null = null;
 
   constructor() {
