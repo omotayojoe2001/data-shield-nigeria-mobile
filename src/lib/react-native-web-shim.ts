@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 
 // React Native Web Shim - provides empty implementations for web
@@ -159,6 +160,18 @@ export const ActivityIndicator: React.FC<{ size?: string; color?: string }> = ({
   });
 };
 
+// RefreshControl component for web
+export const RefreshControl: React.FC<{
+  refreshing?: boolean;
+  onRefresh?: () => void;
+  colors?: string[];
+  tintColor?: string;
+}> = ({ refreshing, onRefresh, colors, tintColor }) => {
+  // For web, we'll return null since pull-to-refresh isn't typically used on web
+  // The parent ScrollView will handle the refresh functionality
+  return null;
+};
+
 // LinearGradient component for web
 export const LinearGradient: React.FC<{ 
   colors: string[]; 
@@ -247,6 +260,7 @@ export default {
   KeyboardAvoidingView,
   TextInput,
   ActivityIndicator,
+  RefreshControl,
   LinearGradient,
   SafeAreaProvider,
   StatusBar,
@@ -256,3 +270,4 @@ export default {
   SplashScreen,
   Alert,
 };
+
