@@ -24,19 +24,25 @@ export const Text = 'span';
 export const TouchableOpacity = 'button';
 export const ScrollView = 'div';
 export const SafeAreaView = 'div';
-export const ActivityIndicator = ({ size = 'small', color = '#007AFF' }: { size?: string; color?: string }) => (
-  <div 
-    className="animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"
-    style={{ 
+
+export const ActivityIndicator: React.FC<{ size?: string; color?: string }> = ({ 
+  size = 'small', 
+  color = '#007AFF' 
+}) => {
+  return React.createElement('div', {
+    className: "animate-spin rounded-full border-2 border-gray-300 border-t-blue-600",
+    style: { 
       width: size === 'large' ? '32px' : '16px', 
       height: size === 'large' ? '32px' : '16px',
       borderTopColor: color
-    }}
-  />
-);
+    }
+  });
+};
 
 // Safe Area Context
-export const SafeAreaProvider = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+export const SafeAreaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return React.createElement('div', null, children);
+};
 
 // Expo modules
 export const StatusBar = () => null;
