@@ -160,7 +160,9 @@ const HomeScreen = () => {
                 <Text style={styles.speedText}>{vpnStats.downloadSpeed} Mbps</Text>
               </View>
               <View style={styles.speedItem}>
-                <TrendingDown size={16} color="#3b82f6" style={{ transform: [{ rotate: '180deg' }] }} />
+                <View style={styles.uploadIcon}>
+                  <TrendingDown size={16} color="#3b82f6" />
+                </View>
                 <Text style={styles.speedText}>{vpnStats.uploadSpeed} Mbps</Text>
               </View>
             </View>
@@ -361,6 +363,9 @@ const styles = StyleSheet.create({
   speedItem: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  uploadIcon: {
+    transform: [{ rotate: '180deg' }],
   },
   speedText: {
     marginLeft: 4,
