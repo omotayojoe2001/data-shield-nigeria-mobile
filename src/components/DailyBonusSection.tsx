@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Gift, Clock, CheckCircle } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { bonusService } from '@/services/bonusService';
-import { toast } from 'sonner';
+import { vpnService } from '@/services/vpnService';
+import { Alert } from 'react-native';
 
 interface DailyBonusSectionProps {
   compact?: boolean;
@@ -24,17 +25,17 @@ const DailyBonusSection = ({ compact = false }: DailyBonusSectionProps) => {
   }, []);
 
   useEffect(() => {
-    // Listen for bonus updates
+    // Listen for bonus updates using VPN service event system
     const handleBonusUpdate = () => {
       loadBonusInfo();
     };
 
-    window.addEventListener('bonus-updated', handleBonusUpdate);
-    window.addEventListener('plan-updated', handleBonusUpdate);
+    vpnService.on('bonus-updated', handleBonusUpdate);
+    vpnService.on('plan-updated', handleBonusUpdate);
 
     return () => {
-      window.removeEventListener('bonus-updated', handleBonusUpdate);
-      window.removeEventListener('plan-updated', handleBonusUpdate);
+      vpnService.off('bonus-updated', handleBonusUpdate);
+      vpnService.off('plan-updated', handleBonusUpdate);
     };
   }, []);
 
@@ -87,17 +88,17 @@ const DailyBonusSection = ({ compact = false }: DailyBonusSectionProps) => {
     try {
       const result = await bonusService.claimDailyBonus();
       if (result.success) {
-        toast.success(result.message);
+        Alert.alert('Success!', result.message);
         await loadBonusInfo();
-        // Trigger plan updates
-        window.dispatchEvent(new CustomEvent('plan-updated'));
-        window.dispatchEvent(new CustomEvent('bonus-updated'));
+        // Trigger plan updates using VPN service event system
+        vpnService.emit('plan-updated');
+        vpnService.emit('bonus-updated');
       } else {
-        toast.error(result.message);
+        Alert.alert('Error', result.message);
       }
     } catch (error) {
       console.error('Error claiming bonus:', error);
-      toast.error('Failed to claim bonus');
+      Alert.alert('Error', 'Failed to claim bonus');
     } finally {
       setClaiming(false);
     }

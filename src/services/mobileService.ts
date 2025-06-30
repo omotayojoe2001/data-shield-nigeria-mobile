@@ -1,9 +1,8 @@
 // Platform detection
 const isReactNative = typeof navigator !== 'undefined' && navigator.product === 'ReactNative';
 const isExpo = typeof global !== 'undefined' && global.__expo;
-const isWeb = typeof window !== 'undefined' && !isReactNative;
 
-// Conditionally import React Native modules only when in RN environment
+// Conditionally import React Native modules
 let Platform: any = null;
 let Network: any = null;
 let Haptics: any = null;
@@ -42,14 +41,8 @@ class MobileService {
 
   private async initializeMobile() {
     try {
-      if (isReactNative || isExpo) {
-        console.log('Mobile service initialized for React Native');
-        this.setupNetworkMonitoring();
-      } else {
-        console.log('Mobile service initialized for Web');
-        this.setupWebNetworkMonitoring();
-      }
-      
+      console.log('Mobile service initialized for React Native');
+      this.setupNetworkMonitoring();
       console.log('Mobile service initialized successfully');
     } catch (error) {
       console.error('Error initializing mobile service:', error);
@@ -64,34 +57,16 @@ class MobileService {
       try {
         const networkState = await Network.getNetworkStateAsync();
         
-        // Dispatch custom event for network changes
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('mobile-network-change', {
-            detail: {
-              connected: networkState.isConnected,
-              connectionType: networkState.type
-            }
-          }));
-        }
+        // Since we don't have window in React Native, we'll use a different approach
+        // You can implement a custom event system or use React Context
+        console.log('Network state:', {
+          connected: networkState.isConnected,
+          connectionType: networkState.type
+        });
       } catch (error) {
         console.error('Network monitoring error:', error);
       }
     }, 5000);
-  }
-
-  private setupWebNetworkMonitoring() {
-    // Web-based network monitoring
-    if (typeof window !== 'undefined' && 'navigator' in window) {
-      this.networkListener = setInterval(() => {
-        const connected = navigator.onLine;
-        window.dispatchEvent(new CustomEvent('mobile-network-change', {
-          detail: {
-            connected,
-            connectionType: connected ? 'wifi' : 'none'
-          }
-        }));
-      }, 5000);
-    }
   }
 
   async getNetworkInfo(): Promise<NetworkInfo> {
@@ -101,12 +76,6 @@ class MobileService {
         return {
           connected: networkState.isConnected || false,
           connectionType: networkState.type || 'unknown'
-        };
-      } else if (typeof navigator !== 'undefined') {
-        // Web fallback
-        return {
-          connected: navigator.onLine,
-          connectionType: navigator.onLine ? 'wifi' : 'none'
         };
       }
       
@@ -132,9 +101,7 @@ class MobileService {
       // Keep VPN connection alive and track usage
       this.backgroundInterval = setInterval(async () => {
         try {
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('background-vpn-check'));
-          }
+          console.log('Background VPN check running...');
         } catch (error) {
           console.error('Background VPN check failed:', error);
         }
@@ -175,12 +142,6 @@ class MobileService {
                           Haptics.ImpactFeedbackStyle.Heavy;
         
         await Haptics.impactAsync(impactStyle);
-      } else {
-        // Web fallback - vibrate API
-        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-          const duration = style === 'light' ? 50 : style === 'medium' ? 100 : 200;
-          navigator.vibrate(duration);
-        }
       }
     } catch (error) {
       console.error('Error triggering haptic:', error);
@@ -188,7 +149,7 @@ class MobileService {
   }
 
   async exitApp(): Promise<void> {
-    console.log('Exit app not supported in React Native/Web');
+    console.log('Exit app not supported in React Native/Expo');
   }
 
   isNative(): boolean {
@@ -199,7 +160,7 @@ class MobileService {
     if (Platform) {
       return Platform.OS;
     }
-    return isWeb ? 'web' : 'unknown';
+    return 'unknown';
   }
 
   // Storage utilities
@@ -207,8 +168,6 @@ class MobileService {
     try {
       if (AsyncStorage) {
         await AsyncStorage.setItem(key, value);
-      } else if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(key, value);
       }
     } catch (error) {
       console.error('Error setting item:', error);
@@ -219,8 +178,6 @@ class MobileService {
     try {
       if (AsyncStorage) {
         return await AsyncStorage.getItem(key);
-      } else if (typeof localStorage !== 'undefined') {
-        return localStorage.getItem(key);
       }
       return null;
     } catch (error) {
@@ -233,8 +190,6 @@ class MobileService {
     try {
       if (AsyncStorage) {
         await AsyncStorage.removeItem(key);
-      } else if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(key);
       }
     } catch (error) {
       console.error('Error removing item:', error);

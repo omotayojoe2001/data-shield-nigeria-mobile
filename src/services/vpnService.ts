@@ -1,3 +1,4 @@
+
 import { apiService } from './apiService';
 import { mobileService } from './mobileService';
 
@@ -34,6 +35,32 @@ interface VpnStatusData {
   };
 }
 
+// Custom event system for React Native
+class EventEmitter {
+  private events: { [key: string]: Function[] } = {};
+
+  on(event: string, callback: Function) {
+    if (!this.events[event]) {
+      this.events[event] = [];
+    }
+    this.events[event].push(callback);
+  }
+
+  off(event: string, callback: Function) {
+    if (this.events[event]) {
+      this.events[event] = this.events[event].filter(cb => cb !== callback);
+    }
+  }
+
+  emit(event: string, data?: any) {
+    if (this.events[event]) {
+      this.events[event].forEach(callback => callback(data));
+    }
+  }
+}
+
+const eventEmitter = new EventEmitter();
+
 class VPNService {
   private stats: VPNStats = {
     isConnected: false,
@@ -51,18 +78,15 @@ class VPNService {
 
   constructor() {
     // Listen for forced disconnections
-    window.addEventListener('vpn-force-disconnect', this.forceDisconnect.bind(this));
-    
-    // Listen for mobile events
-    window.addEventListener('app-resumed', this.handleAppResume.bind(this));
-    window.addEventListener('network-reconnected', this.handleNetworkReconnected.bind(this));
-    window.addEventListener('background-vpn-check', this.handleBackgroundCheck.bind(this));
+    eventEmitter.on('vpn-force-disconnect', this.forceDisconnect.bind(this));
+    eventEmitter.on('app-resumed', this.handleAppResume.bind(this));
+    eventEmitter.on('network-reconnected', this.handleNetworkReconnected.bind(this));
+    eventEmitter.on('background-vpn-check', this.handleBackgroundCheck.bind(this));
   }
 
   private async handleAppResume() {
     console.log('App resumed - checking VPN status');
     if (this.stats.isConnected) {
-      // Refresh VPN status when app resumes
       await this.refreshVpnStatus();
     }
   }
@@ -70,7 +94,6 @@ class VPNService {
   private async handleNetworkReconnected() {
     console.log('Network reconnected - checking VPN');
     if (this.stats.isConnected) {
-      // Try to reconnect VPN if it was connected
       const result = await this.connect();
       if (!result.success) {
         console.error('Failed to reconnect VPN after network change');
@@ -81,7 +104,6 @@ class VPNService {
   private async handleBackgroundCheck() {
     if (this.stats.isConnected) {
       try {
-        // Lightweight VPN status check for background
         const usageResponse = await apiService.trackUsage();
         if (usageResponse.success && usageResponse.data) {
           console.log('Background VPN check successful');
@@ -224,12 +246,10 @@ class VPNService {
                   console.log(`Deducted ₦${(deductResponse.data?.deductedAmount || 0) / 100} for ${newUsage}MB usage`);
                   
                   // Trigger wallet update event
-                  window.dispatchEvent(new CustomEvent('wallet-consumed', {
-                    detail: {
-                      consumed: deductResponse.data?.deductedAmount || 0,
-                      remaining: this.lastVpnStatus?.wallet.balance || 0
-                    }
-                  }));
+                  eventEmitter.emit('wallet-consumed', {
+                    consumed: deductResponse.data?.deductedAmount || 0,
+                    remaining: this.lastVpnStatus?.wallet.balance || 0
+                  });
                 } else {
                   console.error('Failed to deduct usage cost:', deductResponse.error);
                   // If deduction fails, disconnect VPN
@@ -269,10 +289,7 @@ class VPNService {
   }
 
   private onDataUsage(dataMB: number) {
-    const event = new CustomEvent('vpn-data-usage', {
-      detail: { dataMB, timestamp: new Date() }
-    });
-    window.dispatchEvent(event);
+    eventEmitter.emit('vpn-data-usage', { dataMB, timestamp: new Date() });
     console.log(`Backend data usage: ${dataMB.toFixed(2)}MB at ${new Date().toLocaleTimeString()}`);
   }
 
@@ -331,6 +348,19 @@ class VPNService {
       return Math.floor(Math.random() * 40 + 45); // 45-85%
     }
     return Math.round((this.stats.dataSaved / (this.stats.dataUsed + this.stats.dataSaved)) * 100);
+  }
+
+  // Add method to access event emitter for other services
+  on(event: string, callback: Function) {
+    eventEmitter.on(event, callback);
+  }
+
+  off(event: string, callback: Function) {
+    eventEmitter.off(event, callback);
+  }
+
+  emit(event: string, data?: any) {
+    eventEmitter.emit(event, data);
   }
 }
 

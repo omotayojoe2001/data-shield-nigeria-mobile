@@ -26,7 +26,7 @@ const App = () => {
     const prepare = async () => {
       try {
         // Initialize mobile services
-        console.log('Initializing mobile app...');
+        console.log('Initializing React Native app...');
         console.log('Platform:', mobileService.getPlatform());
         console.log('Is native:', mobileService.isNative());
         
