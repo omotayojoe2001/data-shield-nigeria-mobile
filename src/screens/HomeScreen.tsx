@@ -9,7 +9,7 @@ import {
   RefreshControl 
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Shield, ShieldCheck, TrendingDown, BarChart3, User, Settings, Wallet, Gift, ChevronRight } from 'lucide-react';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -142,11 +142,11 @@ const HomeScreen = () => {
             disabled={connecting}
           >
             <View style={styles.connectButtonContent}>
-              <Ionicons 
-                name={vpnStats.isConnected ? "shield-checkmark" : "shield"} 
-                size={32} 
-                color="#ffffff" 
-              />
+              {vpnStats.isConnected ? (
+                <ShieldCheck size={32} color="#ffffff" />
+              ) : (
+                <Shield size={32} color="#ffffff" />
+              )}
               <Text style={styles.connectButtonText}>
                 {connecting ? 'Connecting...' : vpnStats.isConnected ? 'Disconnect' : 'Connect'}
               </Text>
@@ -156,11 +156,11 @@ const HomeScreen = () => {
           {vpnStats.isConnected && (
             <View style={styles.speedInfo}>
               <View style={styles.speedItem}>
-                <Ionicons name="arrow-down" size={16} color="#10b981" />
+                <TrendingDown size={16} color="#10b981" />
                 <Text style={styles.speedText}>{vpnStats.downloadSpeed} Mbps</Text>
               </View>
               <View style={styles.speedItem}>
-                <Ionicons name="arrow-up" size={16} color="#3b82f6" />
+                <TrendingDown size={16} color="#3b82f6" style={{ transform: [{ rotate: '180deg' }] }} />
                 <Text style={styles.speedText}>{vpnStats.uploadSpeed} Mbps</Text>
               </View>
             </View>
@@ -188,7 +188,7 @@ const HomeScreen = () => {
           <TouchableOpacity style={styles.planCard}>
             <View style={styles.planHeader}>
               <Text style={styles.planTitle}>Current Plan</Text>
-              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
+              <ChevronRight size={20} color="#6b7280" />
             </View>
             <Text style={styles.planType}>{currentPlan.plan_type?.toUpperCase()}</Text>
             {currentPlan.data_allocated > 0 && (
@@ -215,7 +215,7 @@ const HomeScreen = () => {
           onPress={() => navigation.navigate('Wallet' as never)}
         >
           <View style={styles.walletHeader}>
-            <Ionicons name="wallet" size={24} color="#10b981" />
+            <Wallet size={24} color="#10b981" />
             <Text style={styles.walletTitle}>Wallet Balance</Text>
           </View>
           <Text style={styles.walletBalance}>
@@ -234,7 +234,7 @@ const HomeScreen = () => {
               style={styles.bonusGradient}
             >
               <View style={styles.bonusContent}>
-                <Ionicons name="gift" size={24} color="#ffffff" />
+                <Gift size={24} color="#ffffff" />
                 <View style={styles.bonusText}>
                   <Text style={styles.bonusTitle}>Daily Bonus Available!</Text>
                   <Text style={styles.bonusSubtitle}>
@@ -252,21 +252,21 @@ const HomeScreen = () => {
             style={styles.actionButton}
             onPress={() => navigation.navigate('Plans' as never)}
           >
-            <Ionicons name="list" size={24} color="#3b82f6" />
+            <BarChart3 size={24} color="#3b82f6" />
             <Text style={styles.actionText}>Plans</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={() => navigation.navigate('Usage' as never)}
           >
-            <Ionicons name="analytics" size={24} color="#10b981" />
+            <BarChart3 size={24} color="#10b981" />
             <Text style={styles.actionText}>Usage</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={() => navigation.navigate('Profile' as never)}
           >
-            <Ionicons name="person" size={24} color="#8b5cf6" />
+            <User size={24} color="#8b5cf6" />
             <Text style={styles.actionText}>Profile</Text>
           </TouchableOpacity>
         </View>
