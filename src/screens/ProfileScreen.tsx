@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { User, Shield, Bell, Lock, LogOut, ChevronRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -54,10 +54,10 @@ const ProfileScreen = () => {
             onPress={() => Alert.alert('Coming Soon', 'Profile editing will be available soon!')}
           >
             <View style={styles.optionLeft}>
-              <Ionicons name="person-circle" size={24} color="#3b82f6" />
+              <User size={24} color="#3b82f6" />
               <Text style={styles.optionText}>Edit Profile</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            <ChevronRight size={20} color="#9ca3af" />
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -65,10 +65,10 @@ const ProfileScreen = () => {
             onPress={() => Alert.alert('Coming Soon', 'Security settings will be available soon!')}
           >
             <View style={styles.optionLeft}>
-              <Ionicons name="shield-checkmark" size={24} color="#10b981" />
+              <Shield size={24} color="#10b981" />
               <Text style={styles.optionText}>Security</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            <ChevronRight size={20} color="#9ca3af" />
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -76,10 +76,10 @@ const ProfileScreen = () => {
             onPress={() => Alert.alert('Coming Soon', 'Notification settings will be available soon!')}
           >
             <View style={styles.optionLeft}>
-              <Ionicons name="notifications" size={24} color="#f59e0b" />
+              <Bell size={24} color="#f59e0b" />
               <Text style={styles.optionText}>Notifications</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            <ChevronRight size={20} color="#9ca3af" />
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -87,10 +87,10 @@ const ProfileScreen = () => {
             onPress={() => Alert.alert('Coming Soon', 'Privacy settings will be available soon!')}
           >
             <View style={styles.optionLeft}>
-              <Ionicons name="lock-closed" size={24} color="#8b5cf6" />
+              <Lock size={24} color="#8b5cf6" />
               <Text style={styles.optionText}>Privacy</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            <ChevronRight size={20} color="#9ca3af" />
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -98,7 +98,7 @@ const ProfileScreen = () => {
             onPress={handleSignOut}
           >
             <View style={styles.optionLeft}>
-              <Ionicons name="log-out" size={24} color="#ef4444" />
+              <LogOut size={24} color="#ef4444" />
               <Text style={[styles.optionText, styles.signOutText]}>Sign Out</Text>
             </View>
           </TouchableOpacity>

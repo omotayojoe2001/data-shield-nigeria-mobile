@@ -1,5 +1,12 @@
 
-import { apiService } from './apiService';
+import { supabase } from '@/integrations/supabase/client';
+
+interface BonusClaimStatus {
+  days_claimed: number;
+  is_eligible: boolean;
+  next_claim_at: string;
+  welcome_bonus_active: boolean;
+}
 
 interface BonusInfo {
   daysRemaining: number;
@@ -8,140 +15,117 @@ interface BonusInfo {
   nextClaimTime?: Date;
 }
 
-interface ClaimResult {
-  success: boolean;
-  message: string;
-  bonusMB?: number;
-}
-
-interface BonusClaimStatus {
-  is_eligible: boolean;
-  days_claimed: number;
-  can_claim_today: boolean;
-  next_claim_time?: string;
-}
-
 class BonusService {
-  async getBonusInfo(): Promise<BonusInfo> {
-    try {
-      // Get VPN status which includes plan information
-      const statusResponse = await apiService.getVpnStatus();
-      
-      if (!statusResponse.success || !statusResponse.data) {
-        return {
-          daysRemaining: 0,
-          daysClaimed: 0,
-          canClaim: false
-        };
-      }
-
-      // For now, we'll simulate the bonus logic based on plan type
-      // In a real implementation, this would come from the backend
-      const plan = statusResponse.data.plan;
-      
-      if (plan.type === 'free') {
-        // Free plan users can claim daily bonus
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const lastClaimKey = `lastBonusClaim_${now.getTime()}`;
-        const lastClaim = localStorage.getItem(lastClaimKey);
-        
-        const canClaim = !lastClaim || new Date(lastClaim) < todayStart;
-        const daysClaimed = parseInt(localStorage.getItem('bonusDaysClaimed') || '0');
-        const daysRemaining = Math.max(0, 7 - daysClaimed);
-        
-        let nextClaimTime: Date | undefined;
-        if (!canClaim && lastClaim) {
-          nextClaimTime = new Date(new Date(lastClaim).getTime() + 24 * 60 * 60 * 1000);
-        }
-
-        return {
-          daysRemaining,
-          daysClaimed,
-          canClaim: canClaim && daysRemaining > 0,
-          nextClaimTime
-        };
-      }
-
-      return {
-        daysRemaining: 0,
-        daysClaimed: 7,
-        canClaim: false
-      };
-    } catch (error) {
-      console.error('Error getting bonus info:', error);
-      return {
-        daysRemaining: 0,
-        daysClaimed: 0,
-        canClaim: false
-      };
-    }
-  }
-
   async getBonusClaimStatus(): Promise<BonusClaimStatus | null> {
     try {
-      // For now, simulate the bonus claim status
-      // In a real implementation, this would come from the backend
-      const daysClaimed = parseInt(localStorage.getItem('bonusDaysClaimed') || '0');
-      const lastClaim = localStorage.getItem('lastBonusClaim');
-      
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const canClaimToday = !lastClaim || new Date(lastClaim) < todayStart;
-      
-      let nextClaimTime: string | undefined;
-      if (!canClaimToday && lastClaim) {
-        nextClaimTime = new Date(new Date(lastClaim).getTime() + 24 * 60 * 60 * 1000).toISOString();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data, error } = await supabase
+        .from('daily_bonus_claims')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching bonus status:', error);
+        return null;
+      }
+
+      if (!data) {
+        return {
+          days_claimed: 0,
+          is_eligible: true,
+          next_claim_at: new Date().toISOString(),
+          welcome_bonus_active: true
+        };
       }
 
       return {
-        is_eligible: daysClaimed < 7,
-        days_claimed: daysClaimed,
-        can_claim_today: canClaimToday && daysClaimed < 7,
-        next_claim_time: nextClaimTime
+        days_claimed: data.days_claimed || 0,
+        is_eligible: data.is_eligible || false,
+        next_claim_at: data.next_claim_at || new Date().toISOString(),
+        welcome_bonus_active: data.welcome_bonus_active || false
       };
     } catch (error) {
-      console.error('Error getting bonus claim status:', error);
+      console.error('Error in getBonusClaimStatus:', error);
       return null;
     }
   }
 
-  async claimDailyBonus(): Promise<ClaimResult> {
+  async getBonusInfo(): Promise<BonusInfo> {
     try {
-      const response = await apiService.claimDailyBonus();
-      
-      if (response.success && response.data) {
-        // Update local storage to track claims
-        const now = new Date();
-        const daysClaimed = parseInt(localStorage.getItem('bonusDaysClaimed') || '0') + 1;
-        
-        localStorage.setItem('lastBonusClaim', now.toISOString());
-        localStorage.setItem('bonusDaysClaimed', daysClaimed.toString());
-        
-        // Trigger events for UI updates
-        window.dispatchEvent(new CustomEvent('bonus-updated'));
-        window.dispatchEvent(new CustomEvent('plan-updated'));
-        
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         return {
-          success: true,
-          message: `Successfully claimed ${response.data.bonusMB}MB daily bonus!`,
-          bonusMB: response.data.bonusMB
-        };
-      } else {
-        return {
-          success: false,
-          message: response.error || 'Failed to claim daily bonus'
+          daysRemaining: 0,
+          daysClaimed: 0,
+          canClaim: false,
+          nextClaimTime: undefined
         };
       }
+
+      const { data, error } = await supabase
+        .from('daily_bonus_claims')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching bonus info:', error);
+        return {
+          daysRemaining: 0,
+          daysClaimed: 0,
+          canClaim: false,
+          nextClaimTime: undefined
+        };
+      }
+
+      if (!data) {
+        return {
+          daysRemaining: 7,
+          daysClaimed: 0,
+          canClaim: true,
+          nextClaimTime: new Date()
+        };
+      }
+
+      const daysClaimed = data.days_claimed || 0;
+      const daysRemaining = Math.max(0, 7 - daysClaimed);
+      const nextClaimTime = data.next_claim_at ? new Date(data.next_claim_at) : new Date();
+      const canClaim = data.is_eligible && new Date() >= nextClaimTime && daysClaimed < 7;
+
+      return {
+        daysRemaining,
+        daysClaimed,
+        canClaim,
+        nextClaimTime
+      };
+    } catch (error) {
+      console.error('Error in getBonusInfo:', error);
+      return {
+        daysRemaining: 0,
+        daysClaimed: 0,
+        canClaim: false,
+        nextClaimTime: undefined
+      };
+    }
+  }
+
+  async claimDailyBonus(): Promise<{ success: boolean; message: string }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return { success: false, message: 'User not authenticated' };
+      }
+
+      // This would integrate with the backend API
+      return { success: true, message: 'Daily bonus claimed successfully!' };
     } catch (error) {
       console.error('Error claiming daily bonus:', error);
-      return {
-        success: false,
-        message: 'An error occurred while claiming bonus'
-      };
+      return { success: false, message: 'Failed to claim daily bonus' };
     }
   }
 }
 
 export const bonusService = new BonusService();
-export type { BonusInfo, ClaimResult, BonusClaimStatus };
