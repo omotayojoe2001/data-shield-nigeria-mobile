@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
@@ -10,7 +9,7 @@ import {
   Alert 
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { ChevronRight, Gift, CheckCircle } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { planService } from '../services/planService';
 import { bonusService } from '../services/bonusService';
@@ -103,7 +102,7 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
             <View style={styles.currentPlanHeader}>
               <Text style={styles.currentPlanTitle}>Current Plan</Text>
               <TouchableOpacity onPress={() => onTabChange('current-plan')}>
-                <Ionicons name="chevron-forward" size={20} color="#6b7280" />
+                <ChevronRight size={20} color="#6b7280" />
               </TouchableOpacity>
             </View>
             <Text style={styles.currentPlanType}>{currentPlan.plan_type?.toUpperCase()}</Text>
@@ -140,7 +139,7 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
                   style={styles.bonusGradient}
                 >
                   <View style={styles.bonusContent}>
-                    <Ionicons name="gift" size={32} color="#ffffff" />
+                    <Gift size={32} color="#ffffff" />
                     <View style={styles.bonusText}>
                       <Text style={styles.bonusTitle}>Claim 200MB Bonus!</Text>
                       <Text style={styles.bonusSubtitle}>
@@ -153,7 +152,7 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
             ) : (
               <View style={styles.bonusCard}>
                 <View style={styles.bonusDisabled}>
-                  <Ionicons name="gift" size={32} color="#9ca3af" />
+                  <Gift size={32} color="#9ca3af" />
                   <View style={styles.bonusText}>
                     <Text style={styles.bonusDisabledTitle}>
                       {bonusInfo.daysClaimed >= 7 ? 'Bonus Complete' : 'Bonus Claimed'}
@@ -183,15 +182,15 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
             </Text>
             <View style={styles.planFeatures}>
               <View style={styles.planFeature}>
-                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                <CheckCircle size={16} color="#10b981" />
                 <Text style={styles.planFeatureText}>200MB per day</Text>
               </View>
               <View style={styles.planFeature}>
-                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                <CheckCircle size={16} color="#10b981" />
                 <Text style={styles.planFeatureText}>7 days validity</Text>
               </View>
               <View style={styles.planFeature}>
-                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                <CheckCircle size={16} color="#10b981" />
                 <Text style={styles.planFeatureText}>Daily bonus claims</Text>
               </View>
             </View>
@@ -215,15 +214,15 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
             </Text>
             <View style={styles.planFeatures}>
               <View style={styles.planFeature}>
-                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                <CheckCircle size={16} color="#10b981" />
                 <Text style={styles.planFeatureText}>No expiry date</Text>
               </View>
               <View style={styles.planFeature}>
-                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                <CheckCircle size={16} color="#10b981" />
                 <Text style={styles.planFeatureText}>Pay per usage</Text>
               </View>
               <View style={styles.planFeature}>
-                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                <CheckCircle size={16} color="#10b981" />
                 <Text style={styles.planFeatureText}>Full control</Text>
               </View>
             </View>
@@ -246,15 +245,15 @@ const PlansScreen = ({ onTabChange }: PlansScreenProps) => {
             </Text>
             <View style={styles.planFeatures}>
               <View style={styles.planFeature}>
-                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                <CheckCircle size={16} color="#10b981" />
                 <Text style={styles.planFeatureText}>30 days validity</Text>
               </View>
               <View style={styles.planFeature}>
-                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                <CheckCircle size={16} color="#10b981" />
                 <Text style={styles.planFeatureText}>Better rates</Text>
               </View>
               <View style={styles.planFeature}>
-                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                <CheckCircle size={16} color="#10b981" />
                 <Text style={styles.planFeatureText}>Bulk savings</Text>
               </View>
             </View>
