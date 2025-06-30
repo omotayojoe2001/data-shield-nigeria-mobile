@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, List, BarChart3, Wallet, User } from 'lucide-react';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import HomeScreen from '../screens/HomeScreen';
 import PlansScreen from '../screens/PlansScreen';
@@ -19,23 +19,23 @@ const TabNavigator = () => {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
-          let IconComponent;
+          let iconName: keyof typeof Ionicons.glyphMap;
 
           if (route.name === 'Home') {
-            IconComponent = Home;
+            iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Plans') {
-            IconComponent = List;
+            iconName = focused ? 'list' : 'list-outline';
           } else if (route.name === 'Usage') {
-            IconComponent = BarChart3;
+            iconName = focused ? 'analytics' : 'analytics-outline';
           } else if (route.name === 'Wallet') {
-            IconComponent = Wallet;
+            iconName = focused ? 'wallet' : 'wallet-outline';
           } else if (route.name === 'Profile') {
-            IconComponent = User;
+            iconName = focused ? 'person' : 'person-outline';
           } else {
-            IconComponent = Home;
+            iconName = 'home-outline';
           }
 
-          return <IconComponent size={size} color={color} />;
+          return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#3b82f6',
         tabBarInactiveTintColor: theme === 'dark' ? '#9ca3af' : '#6b7280',

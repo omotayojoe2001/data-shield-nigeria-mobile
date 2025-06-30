@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 
 // React Native Web Shim - provides empty implementations for web
@@ -19,132 +18,12 @@ export const StyleSheet = {
   create: (styles: any) => styles,
 };
 
-// PixelRatio shim for expo-asset
-export const PixelRatio = {
-  get: () => typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
-  getPixelSizeForLayoutSize: (layoutSize: number) => Math.round(layoutSize * (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)),
-};
-
-// NativeModules shim for expo-modules-core
-export const NativeModules = {};
-
-// NativeEventEmitter shim for expo-modules-core
-export class NativeEventEmitter {
-  constructor(nativeModule?: any) {}
-  addListener(eventType: string, listener: (...args: any[]) => any, context?: Object) {
-    return { remove: () => {} };
-  }
-  removeAllListeners(eventType?: string) {}
-  removeSubscription(subscription: any) {}
-  emit(eventType: string, ...params: any[]) {}
-  removeListener(eventType: string, listener: (...args: any[]) => any) {}
-}
-
-// AppRegistry shim for expo
-export const AppRegistry = {
-  registerComponent: (appName: string, getComponentFunc: () => React.ComponentType<any>) => {},
-  runApplication: (appName: string, initialProps: any) => {},
-  getAppKeys: () => [],
-  unmountApplicationComponentAtRootTag: (rootTag: number) => {},
-};
-
-// LogBox shim for expo
-export const LogBox = {
-  install: () => {},
-  uninstall: () => {},
-  ignoreLogs: (patterns: string[]) => {},
-  ignoreAllLogs: (ignore?: boolean) => {},
-};
-
-// Animated shim for React Native animations
-export const Animated = {
-  View: 'div',
-  Text: 'span',
-  Value: class {
-    constructor(value: number) {
-      this._value = value;
-    }
-    _value: number;
-    setValue(value: number) {
-      this._value = value;
-    }
-    addListener(callback: (value: { value: number }) => void) {
-      return { remove: () => {} };
-    }
-  },
-  timing: (value: any, config: any) => ({
-    start: (callback?: () => void) => {
-      if (callback) setTimeout(callback, config.duration || 0);
-    },
-  }),
-  spring: (value: any, config: any) => ({
-    start: (callback?: () => void) => {
-      if (callback) setTimeout(callback, 1000);
-    },
-  }),
-  parallel: (animations: any[]) => ({
-    start: (callback?: () => void) => {
-      if (callback) setTimeout(callback, 1000);
-    },
-  }),
-};
-
 // Component mappings
 export const View = 'div';
 export const Text = 'span';
 export const TouchableOpacity = 'button';
 export const ScrollView = 'div';
 export const SafeAreaView = 'div';
-export const KeyboardAvoidingView = 'div';
-
-// TextInput component for web
-export const TextInput: React.FC<{
-  style?: any;
-  placeholder?: string;
-  placeholderTextColor?: string;
-  value?: string;
-  onChangeText?: (text: string) => void;
-  keyboardType?: string;
-  autoCapitalize?: string;
-  secureTextEntry?: boolean;
-  autoCorrect?: boolean;
-  autoFocus?: boolean;
-}> = ({
-  style,
-  placeholder,
-  placeholderTextColor,
-  value,
-  onChangeText,
-  keyboardType,
-  autoCapitalize,
-  secureTextEntry,
-  autoCorrect,
-  autoFocus,
-  ...props
-}) => {
-  const inputType = secureTextEntry ? 'password' : keyboardType === 'email-address' ? 'email' : 'text';
-  
-  return React.createElement('input', {
-    type: inputType,
-    placeholder,
-    value,
-    onChange: (e: any) => onChangeText?.(e.target.value),
-    style: {
-      backgroundColor: 'transparent',
-      border: 'none',
-      outline: 'none',
-      color: 'inherit',
-      fontSize: 'inherit',
-      fontFamily: 'inherit',
-      width: '100%',
-      ...style
-    },
-    autoCapitalize: autoCapitalize === 'none' ? 'off' : undefined,
-    autoCorrect: autoCorrect === false ? 'off' : undefined,
-    autoFocus,
-    ...props
-  });
-};
 
 export const ActivityIndicator: React.FC<{ size?: string; color?: string }> = ({ 
   size = 'small', 
@@ -158,37 +37,6 @@ export const ActivityIndicator: React.FC<{ size?: string; color?: string }> = ({
       borderTopColor: color
     }
   });
-};
-
-// RefreshControl component for web
-export const RefreshControl: React.FC<{
-  refreshing?: boolean;
-  onRefresh?: () => void;
-  colors?: string[];
-  tintColor?: string;
-}> = ({ refreshing, onRefresh, colors, tintColor }) => {
-  // For web, we'll return null since pull-to-refresh isn't typically used on web
-  // The parent ScrollView will handle the refresh functionality
-  return null;
-};
-
-// LinearGradient component for web
-export const LinearGradient: React.FC<{ 
-  colors: string[]; 
-  children: React.ReactNode;
-  style?: any;
-  start?: { x: number; y: number };
-  end?: { x: number; y: number };
-}> = ({ colors, children, style, start = { x: 0, y: 0 }, end = { x: 0, y: 1 } }) => {
-  const gradientDirection = `${start.x * 100}% ${start.y * 100}%, ${end.x * 100}% ${end.y * 100}%`;
-  const gradient = `linear-gradient(to bottom, ${colors.join(', ')})`;
-  
-  return React.createElement('div', {
-    style: {
-      background: gradient,
-      ...style
-    }
-  }, children);
 };
 
 // Safe Area Context
@@ -246,22 +94,12 @@ export default {
   Platform,
   Dimensions,
   StyleSheet,
-  PixelRatio,
-  NativeModules,
-  NativeEventEmitter,
-  AppRegistry,
-  LogBox,
-  Animated,
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  KeyboardAvoidingView,
-  TextInput,
   ActivityIndicator,
-  RefreshControl,
-  LinearGradient,
   SafeAreaProvider,
   StatusBar,
   AsyncStorage,
@@ -270,4 +108,3 @@ export default {
   SplashScreen,
   Alert,
 };
-

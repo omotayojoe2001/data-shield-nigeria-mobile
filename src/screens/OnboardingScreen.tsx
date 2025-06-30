@@ -2,6 +2,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 interface OnboardingScreenProps {
   onComplete: () => void;
@@ -15,13 +16,31 @@ const OnboardingScreen = ({ onComplete }: OnboardingScreenProps) => {
     >
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
-          <Text style={styles.title}>Welcome to GoodDeeds VPN!</Text>
+          <View style={styles.logoContainer}>
+            <Text style={styles.logoEmoji}>🛡️</Text>
+          </View>
+          <Text style={styles.title}>Welcome to GoodDeeds VPN</Text>
           <Text style={styles.subtitle}>
-            Get started with secure, fast, and affordable VPN service
+            Save up to 70% on your data usage with our smart compression technology
           </Text>
           
-          <TouchableOpacity style={styles.button} onPress={onComplete}>
-            <Text style={styles.buttonText}>Get Started</Text>
+          <View style={styles.features}>
+            <View style={styles.feature}>
+              <Ionicons name="shield-checkmark" size={24} color="#10b981" />
+              <Text style={styles.featureText}>Secure & Private</Text>
+            </View>
+            <View style={styles.feature}>
+              <Ionicons name="flash" size={24} color="#f59e0b" />
+              <Text style={styles.featureText}>Fast Connection</Text>
+            </View>
+            <View style={styles.feature}>
+              <Ionicons name="trending-down" size={24} color="#3b82f6" />
+              <Text style={styles.featureText}>Data Savings</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.continueButton} onPress={onComplete}>
+            <Text style={styles.continueText}>Get Started</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -40,31 +59,62 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 32,
+  },
+  logoContainer: {
+    width: 100,
+    height: 100,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  logoEmoji: {
+    fontSize: 40,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 16,
     textAlign: 'center',
+    marginBottom: 16,
   },
   subtitle: {
     fontSize: 16,
     color: '#bfdbfe',
-    marginBottom: 40,
     textAlign: 'center',
+    marginBottom: 48,
+    lineHeight: 24,
   },
-  button: {
+  features: {
+    width: '100%',
+    marginBottom: 48,
+  },
+  feature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  featureText: {
+    fontSize: 16,
+    color: '#ffffff',
+    marginLeft: 16,
+    fontWeight: '500',
+  },
+  continueButton: {
     backgroundColor: '#06b6d4',
-    paddingHorizontal: 32,
+    paddingHorizontal: 48,
     paddingVertical: 16,
     borderRadius: 16,
+    width: '100%',
+    alignItems: 'center',
   },
-  buttonText: {
+  continueText: {
     color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
 

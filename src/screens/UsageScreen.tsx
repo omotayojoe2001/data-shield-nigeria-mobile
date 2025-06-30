@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
-import { BarChart3 } from 'lucide-react';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
 const UsageScreen = () => {
@@ -19,7 +20,7 @@ const UsageScreen = () => {
         </View>
 
         <View style={styles.comingSoon}>
-          <BarChart3 size={64} color="#6b7280" />
+          <Ionicons name="analytics" size={64} color="#6b7280" />
           <Text style={styles.comingSoonTitle}>Coming Soon</Text>
           <Text style={styles.comingSoonText}>
             Detailed usage analytics and insights will be available soon

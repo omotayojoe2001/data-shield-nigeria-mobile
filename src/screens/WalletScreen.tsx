@@ -1,12 +1,13 @@
+
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Wallet, Plus, Receipt } from 'lucide-react';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface WalletScreenProps {
-  onTabChange?: (tab: string) => void;
+  onTabChange: (tab: string) => void;
 }
 
 const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
@@ -43,7 +44,7 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
         {/* Balance Card */}
         <View style={styles.balanceCard}>
           <View style={styles.balanceHeader}>
-            <Wallet size={32} color="#10b981" />
+            <Ionicons name="wallet" size={32} color="#10b981" />
             <Text style={styles.balanceLabel}>Current Balance</Text>
           </View>
           <Text style={styles.balanceAmount}>
@@ -73,7 +74,7 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
             style={styles.customButton}
             onPress={() => Alert.alert('Coming Soon', 'Custom amount top-up will be available soon!')}
           >
-            <Plus size={24} color="#3b82f6" />
+            <Ionicons name="add-circle" size={24} color="#3b82f6" />
             <Text style={styles.customText}>Custom Amount</Text>
           </TouchableOpacity>
         </View>
@@ -88,7 +89,7 @@ const WalletScreen = ({ onTabChange }: WalletScreenProps) => {
           </View>
           
           <View style={styles.emptyState}>
-            <Receipt size={48} color="#9ca3af" />
+            <Ionicons name="receipt" size={48} color="#9ca3af" />
             <Text style={styles.emptyTitle}>No transactions yet</Text>
             <Text style={styles.emptyText}>
               Your transaction history will appear here

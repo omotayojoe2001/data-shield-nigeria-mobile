@@ -1,97 +1,95 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-interface ReferralStats {
-  totalReferrals: number;
-  totalEarnings: number;
-  currentCommissionRate: number;
-  nextMilestone: number;
-}
-
 class ReferralService {
-  async processReferralEarning(referrerId: string, amount: number): Promise<boolean> {
+  async processReferralEarning(referrerId: string, purchaseAmount: number): Promise<void> {
     try {
-      // Calculate 2% commission
-      const commission = Math.floor(amount * 0.02);
+      console.log(`Processing referral earning for referrer ${referrerId}, purchase: ₦${purchaseAmount / 100}`);
       
-      // Add to referrer's wallet
-      const { error: walletError } = await supabase
+      // Get referrer's total referral count
+      const { data: referralCount } = await supabase
+        .from('referrals')
+        .select('id')
+        .eq('referrer_id', referrerId)
+        .eq('status', 'completed');
+
+      const totalReferrals = referralCount?.length || 0;
+      
+      // Determine commission rate: 3% for 50+ referrals, 2% otherwise
+      const commissionRate = totalReferrals >= 50 ? 3.0 : 2.0;
+      const commissionAmount = Math.round((purchaseAmount * commissionRate) / 100);
+      
+      console.log(`Commission rate: ${commissionRate}% (${totalReferrals} referrals), earning: ₦${commissionAmount / 100}`);
+      
+      // Add commission to referrer's wallet
+      const { data: wallet } = await supabase
         .from('wallet')
-        .update({ 
-          referral_bonus: commission,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', referrerId);
+        .select('balance, referral_bonus')
+        .eq('user_id', referrerId)
+        .single();
 
-      if (walletError) {
-        console.error('Error updating referrer wallet:', walletError);
-        return false;
+      if (wallet) {
+        await supabase
+          .from('wallet')
+          .update({
+            balance: wallet.balance + commissionAmount,
+            referral_bonus: (wallet.referral_bonus || 0) + commissionAmount,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', referrerId);
+
+        // Record the earning
+        await supabase
+          .from('referral_earnings')
+          .insert({
+            referrer_id: referrerId,
+            purchase_amount: purchaseAmount / 100, // Store in naira
+            commission_rate: commissionRate,
+            commission_amount: commissionAmount / 100, // Store in naira
+          });
+
+        // Record transaction
+        await supabase
+          .from('transactions')
+          .insert({
+            user_id: referrerId,
+            type: 'referral_earning',
+            amount: commissionAmount,
+            description: `${commissionRate}% referral commission from data purchase`,
+            status: 'completed'
+          });
+
+        console.log(`Referral earning processed successfully: ₦${commissionAmount / 100}`);
       }
-
-      // Record the earning
-      const { error: earningError } = await supabase
-        .from('referral_earnings')
-        .insert({
-          referrer_id: referrerId,
-          purchase_amount: amount,
-          commission_amount: commission
-        });
-
-      if (earningError) {
-        console.error('Error recording referral earning:', earningError);
-        return false;
-      }
-
-      return true;
     } catch (error) {
       console.error('Error processing referral earning:', error);
-      return false;
     }
   }
 
-  async getReferralStats(userId: string): Promise<ReferralStats> {
+  async getReferralStats(userId: string) {
     try {
-      // Get total referrals count
-      const { data: referralsData, error: referralsError } = await supabase
+      const { data: referrals } = await supabase
         .from('referrals')
-        .select('id')
+        .select('*')
         .eq('referrer_id', userId);
 
-      if (referralsError) {
-        console.error('Error fetching referrals:', referralsError);
-      }
-
-      const totalReferrals = referralsData?.length || 0;
-
-      // Get total earnings
-      const { data: earningsData, error: earningsError } = await supabase
+      const { data: earnings } = await supabase
         .from('referral_earnings')
         .select('commission_amount')
         .eq('referrer_id', userId);
 
-      if (earningsError) {
-        console.error('Error fetching earnings:', earningsError);
-      }
-
-      const totalEarnings = earningsData?.reduce((sum, earning) => sum + Number(earning.commission_amount), 0) || 0;
-
-      // Determine commission rate based on referrals
-      const currentCommissionRate = totalReferrals >= 50 ? 3.0 : 2.0;
-
-      // Calculate next milestone
-      let nextMilestone = 0;
-      if (totalReferrals < 50) {
-        nextMilestone = 50 - totalReferrals;
-      }
+      const totalReferrals = referrals?.length || 0;
+      const totalEarnings = earnings?.reduce((sum, e) => sum + (e.commission_amount * 100), 0) || 0; // Convert to kobo
+      const currentRate = totalReferrals >= 50 ? 3.0 : 2.0;
 
       return {
         totalReferrals,
         totalEarnings,
-        currentCommissionRate,
-        nextMilestone
+        currentCommissionRate: currentRate,
+        nextMilestone: totalReferrals >= 50 ? null : 50 - totalReferrals
       };
     } catch (error) {
-      console.error('Error in getReferralStats:', error);
+      console.error('Error getting referral stats:', error);
       return {
         totalReferrals: 0,
         totalEarnings: 0,

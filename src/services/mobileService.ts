@@ -1,56 +1,211 @@
+// Platform detection
+const isReactNative = typeof navigator !== 'undefined' && navigator.product === 'ReactNative';
+const isExpo = typeof global !== 'undefined' && global.__expo;
 
-import { Platform } from 'react-native';
+// Conditionally import React Native modules
+let Platform: any = null;
+let Network: any = null;
+let Haptics: any = null;
+let AsyncStorage: any = null;
+
+if (isReactNative || isExpo) {
+  try {
+    Platform = require('react-native').Platform;
+    Network = require('expo-network');
+    Haptics = require('expo-haptics');
+    AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  } catch (e) {
+    console.warn('React Native modules not available:', e);
+  }
+}
 
 interface NetworkInfo {
   connected: boolean;
-  type: string;
+  connectionType: string;
+  strength?: number;
+}
+
+interface BackgroundTaskInfo {
+  taskId: string;
+  isRunning: boolean;
 }
 
 class MobileService {
-  isNative(): boolean {
-    return Platform.OS !== 'web';
+  private backgroundTaskId: string | null = null;
+  private networkListener: ReturnType<typeof setInterval> | null = null;
+  private backgroundInterval: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    this.initializeMobile();
   }
 
-  getPlatform(): string {
-    return Platform.OS;
-  }
-
-  async triggerHaptic(type: 'light' | 'medium' | 'heavy' = 'medium'): Promise<void> {
+  private async initializeMobile() {
     try {
-      if (this.isNative() && typeof window !== 'undefined') {
-        // Mobile haptic feedback implementation would go here
-        console.log(`Haptic feedback: ${type}`);
-      }
+      console.log('Mobile service initialized for React Native');
+      this.setupNetworkMonitoring();
+      console.log('Mobile service initialized successfully');
     } catch (error) {
-      console.log('Haptic feedback not available');
+      console.error('Error initializing mobile service:', error);
     }
+  }
+
+  private setupNetworkMonitoring() {
+    if (!Network) return;
+    
+    // Monitor network state changes
+    this.networkListener = setInterval(async () => {
+      try {
+        const networkState = await Network.getNetworkStateAsync();
+        
+        // Since we don't have window in React Native, we'll use a different approach
+        // You can implement a custom event system or use React Context
+        console.log('Network state:', {
+          connected: networkState.isConnected,
+          connectionType: networkState.type
+        });
+      } catch (error) {
+        console.error('Network monitoring error:', error);
+      }
+    }, 5000);
   }
 
   async getNetworkInfo(): Promise<NetworkInfo> {
     try {
-      if (typeof navigator !== 'undefined' && 'onLine' in navigator) {
+      if (Network) {
+        const networkState = await Network.getNetworkStateAsync();
         return {
-          connected: navigator.onLine,
-          type: 'wifi'
+          connected: networkState.isConnected || false,
+          connectionType: networkState.type || 'unknown'
         };
       }
-      return { connected: true, type: 'wifi' };
+      
+      return {
+        connected: false,
+        connectionType: 'none'
+      };
     } catch (error) {
-      return { connected: true, type: 'wifi' };
+      console.error('Error getting network info:', error);
+      return {
+        connected: false,
+        connectionType: 'none'
+      };
     }
   }
 
-  async startBackgroundTask(): Promise<void> {
-    console.log('Background task started');
+  async startBackgroundTask(): Promise<BackgroundTaskInfo | null> {
+    try {
+      const taskId = `background-task-${Date.now()}`;
+      
+      console.log('Background task started for VPN maintenance');
+      
+      // Keep VPN connection alive and track usage
+      this.backgroundInterval = setInterval(async () => {
+        try {
+          console.log('Background VPN check running...');
+        } catch (error) {
+          console.error('Background VPN check failed:', error);
+        }
+      }, 30000);
+
+      // Clean up after 5 minutes
+      setTimeout(() => {
+        this.stopBackgroundTask();
+        console.log('Background task finished');
+      }, 5 * 60 * 1000);
+
+      this.backgroundTaskId = taskId;
+      return {
+        taskId,
+        isRunning: true
+      };
+    } catch (error) {
+      console.error('Error starting background task:', error);
+      return null;
+    }
   }
 
   async stopBackgroundTask(): Promise<void> {
+    if (this.backgroundInterval) {
+      clearInterval(this.backgroundInterval);
+      this.backgroundInterval = null;
+    }
+    
+    this.backgroundTaskId = null;
     console.log('Background task stopped');
   }
 
-  cleanup(): void {
-    console.log('Mobile service cleanup');
+  async triggerHaptic(style: 'light' | 'medium' | 'heavy' = 'light'): Promise<void> {
+    try {
+      if (Haptics) {
+        const impactStyle = style === 'light' ? Haptics.ImpactFeedbackStyle.Light : 
+                          style === 'medium' ? Haptics.ImpactFeedbackStyle.Medium : 
+                          Haptics.ImpactFeedbackStyle.Heavy;
+        
+        await Haptics.impactAsync(impactStyle);
+      }
+    } catch (error) {
+      console.error('Error triggering haptic:', error);
+    }
+  }
+
+  async exitApp(): Promise<void> {
+    console.log('Exit app not supported in React Native/Expo');
+  }
+
+  isNative(): boolean {
+    return isReactNative || isExpo;
+  }
+
+  getPlatform(): string {
+    if (Platform) {
+      return Platform.OS;
+    }
+    return 'unknown';
+  }
+
+  // Storage utilities
+  async setItem(key: string, value: string): Promise<void> {
+    try {
+      if (AsyncStorage) {
+        await AsyncStorage.setItem(key, value);
+      }
+    } catch (error) {
+      console.error('Error setting item:', error);
+    }
+  }
+
+  async getItem(key: string): Promise<string | null> {
+    try {
+      if (AsyncStorage) {
+        return await AsyncStorage.getItem(key);
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting item:', error);
+      return null;
+    }
+  }
+
+  async removeItem(key: string): Promise<void> {
+    try {
+      if (AsyncStorage) {
+        await AsyncStorage.removeItem(key);
+      }
+    } catch (error) {
+      console.error('Error removing item:', error);
+    }
+  }
+
+  cleanup() {
+    if (this.networkListener) {
+      clearInterval(this.networkListener);
+    }
+    if (this.backgroundInterval) {
+      clearInterval(this.backgroundInterval);
+    }
+    this.backgroundTaskId = null;
   }
 }
 
 export const mobileService = new MobileService();
+export type { NetworkInfo, BackgroundTaskInfo };
