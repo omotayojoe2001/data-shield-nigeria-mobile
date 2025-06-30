@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 // React Native Web Shim - provides empty implementations for web
@@ -20,6 +19,18 @@ export const StyleSheet = {
 
 // NativeModules shim for expo-modules-core
 export const NativeModules = {};
+
+// NativeEventEmitter shim for expo-modules-core
+export class NativeEventEmitter {
+  constructor(nativeModule?: any) {}
+  addListener(eventType: string, listener: (...args: any[]) => any, context?: Object) {
+    return { remove: () => {} };
+  }
+  removeAllListeners(eventType?: string) {}
+  removeSubscription(subscription: any) {}
+  emit(eventType: string, ...params: any[]) {}
+  removeListener(eventType: string, listener: (...args: any[]) => any) {}
+}
 
 // Component mappings
 export const View = 'div';
@@ -117,6 +128,7 @@ export default {
   Dimensions,
   StyleSheet,
   NativeModules,
+  NativeEventEmitter,
   View,
   Text,
   TouchableOpacity,
