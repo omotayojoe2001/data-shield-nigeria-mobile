@@ -39,6 +39,25 @@ export const ActivityIndicator: React.FC<{ size?: string; color?: string }> = ({
   });
 };
 
+// LinearGradient component for web
+export const LinearGradient: React.FC<{ 
+  colors: string[]; 
+  children: React.ReactNode;
+  style?: any;
+  start?: { x: number; y: number };
+  end?: { x: number; y: number };
+}> = ({ colors, children, style, start = { x: 0, y: 0 }, end = { x: 0, y: 1 } }) => {
+  const gradientDirection = `${start.x * 100}% ${start.y * 100}%, ${end.x * 100}% ${end.y * 100}%`;
+  const gradient = `linear-gradient(to bottom, ${colors.join(', ')})`;
+  
+  return React.createElement('div', {
+    style: {
+      background: gradient,
+      ...style
+    }
+  }, children);
+};
+
 // Safe Area Context
 export const SafeAreaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return React.createElement('div', null, children);
@@ -100,6 +119,7 @@ export default {
   ScrollView,
   SafeAreaView,
   ActivityIndicator,
+  LinearGradient,
   SafeAreaProvider,
   StatusBar,
   AsyncStorage,
