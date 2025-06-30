@@ -18,6 +18,9 @@ export const StyleSheet = {
   create: (styles: any) => styles,
 };
 
+// NativeModules shim for expo-modules-core
+export const NativeModules = {};
+
 // Component mappings
 export const View = 'div';
 export const Text = 'span';
@@ -113,6 +116,7 @@ export default {
   Platform,
   Dimensions,
   StyleSheet,
+  NativeModules,
   View,
   Text,
   TouchableOpacity,
