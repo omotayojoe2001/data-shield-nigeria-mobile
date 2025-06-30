@@ -96,6 +96,55 @@ export const ScrollView = 'div';
 export const SafeAreaView = 'div';
 export const KeyboardAvoidingView = 'div';
 
+// TextInput component for web
+export const TextInput: React.FC<{
+  style?: any;
+  placeholder?: string;
+  placeholderTextColor?: string;
+  value?: string;
+  onChangeText?: (text: string) => void;
+  keyboardType?: string;
+  autoCapitalize?: string;
+  secureTextEntry?: boolean;
+  autoCorrect?: boolean;
+  autoFocus?: boolean;
+}> = ({
+  style,
+  placeholder,
+  placeholderTextColor,
+  value,
+  onChangeText,
+  keyboardType,
+  autoCapitalize,
+  secureTextEntry,
+  autoCorrect,
+  autoFocus,
+  ...props
+}) => {
+  const inputType = secureTextEntry ? 'password' : keyboardType === 'email-address' ? 'email' : 'text';
+  
+  return React.createElement('input', {
+    type: inputType,
+    placeholder,
+    value,
+    onChange: (e: any) => onChangeText?.(e.target.value),
+    style: {
+      backgroundColor: 'transparent',
+      border: 'none',
+      outline: 'none',
+      color: 'inherit',
+      fontSize: 'inherit',
+      fontFamily: 'inherit',
+      width: '100%',
+      ...style
+    },
+    autoCapitalize: autoCapitalize === 'none' ? 'off' : undefined,
+    autoCorrect: autoCorrect === false ? 'off' : undefined,
+    autoFocus,
+    ...props
+  });
+};
+
 export const ActivityIndicator: React.FC<{ size?: string; color?: string }> = ({ 
   size = 'small', 
   color = '#007AFF' 
@@ -196,6 +245,7 @@ export default {
   ScrollView,
   SafeAreaView,
   KeyboardAvoidingView,
+  TextInput,
   ActivityIndicator,
   LinearGradient,
   SafeAreaProvider,
