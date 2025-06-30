@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 
 // React Native Web Shim - provides empty implementations for web
@@ -54,6 +52,39 @@ export const LogBox = {
   uninstall: () => {},
   ignoreLogs: (patterns: string[]) => {},
   ignoreAllLogs: (ignore?: boolean) => {},
+};
+
+// Animated shim for React Native animations
+export const Animated = {
+  View: 'div',
+  Text: 'span',
+  Value: class {
+    constructor(value: number) {
+      this._value = value;
+    }
+    _value: number;
+    setValue(value: number) {
+      this._value = value;
+    }
+    addListener(callback: (value: { value: number }) => void) {
+      return { remove: () => {} };
+    }
+  },
+  timing: (value: any, config: any) => ({
+    start: (callback?: () => void) => {
+      if (callback) setTimeout(callback, config.duration || 0);
+    },
+  }),
+  spring: (value: any, config: any) => ({
+    start: (callback?: () => void) => {
+      if (callback) setTimeout(callback, 1000);
+    },
+  }),
+  parallel: (animations: any[]) => ({
+    start: (callback?: () => void) => {
+      if (callback) setTimeout(callback, 1000);
+    },
+  }),
 };
 
 // Component mappings
@@ -156,6 +187,7 @@ export default {
   NativeEventEmitter,
   AppRegistry,
   LogBox,
+  Animated,
   View,
   Text,
   TouchableOpacity,
