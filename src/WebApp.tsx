@@ -1,13 +1,22 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { Toaster } from './components/ui/sonner';
+import { AuthProvider } from './contexts/AuthContext';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import HomePage from './pages/HomePage';
+import AuthPage from './pages/AuthPage';
+import DashboardPage from './pages/DashboardPage';
+import PlansPage from './pages/PlansPage';
+import WalletPage from './pages/WalletPage';
+import ProfilePage from './pages/ProfilePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 5 * 60 * 1000,
     },
   },
 });
@@ -16,26 +25,22 @@ const WebApp = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-          <div className="text-center p-8">
-            <h1 className="text-4xl font-bold text-blue-600 mb-4">
-              GoodDeeds Data VPN
-            </h1>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              This is a React Native/Expo app designed for mobile platforms.
-            </p>
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-lg max-w-md">
-              <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">
-                How to run this app:
-              </h2>
-              <div className="text-left space-y-3 text-sm text-gray-600 dark:text-gray-300">
-                <p>• <strong>Mobile (Recommended):</strong> Use Expo Go app</p>
-                <p>• <strong>Development:</strong> Run with Expo CLI</p>
-                <p>• <strong>Production:</strong> Build with EAS Build</p>
-              </div>
+        <AuthProvider>
+          <Router>
+            <div className="min-h-screen bg-background">
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/auth" element={<AuthPage />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/plans" element={<PlansPage />} />
+                <Route path="/wallet" element={<WalletPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+              <Toaster />
             </div>
-          </div>
-        </div>
+          </Router>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
