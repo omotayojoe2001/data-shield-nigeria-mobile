@@ -14,7 +14,7 @@ import {
   Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { ArrowLeft, User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface AuthScreenProps {
@@ -106,7 +106,7 @@ const AuthScreen = ({ onComplete }: AuthScreenProps) => {
                   style={styles.backButton}
                   onPress={() => setMode('signin')}
                 >
-                  <Ionicons name="arrow-back" size={20} color="rgba(255, 255, 255, 0.8)" />
+                  <ArrowLeft size={20} color="rgba(255, 255, 255, 0.8)" />
                   <Text style={styles.backText}>Back to Sign In</Text>
                 </TouchableOpacity>
               )}
@@ -139,7 +139,7 @@ const AuthScreen = ({ onComplete }: AuthScreenProps) => {
               <View style={styles.inputContainer}>
                 {mode === 'signup' && (
                   <View style={styles.inputWrapper}>
-                    <Ionicons name="person" size={20} color="#bfdbfe" style={styles.inputIcon} />
+                    <User size={20} color="#bfdbfe" style={styles.inputIcon} />
                     <TextInput
                       style={styles.textInput}
                       placeholder="Full Name"
@@ -152,7 +152,7 @@ const AuthScreen = ({ onComplete }: AuthScreenProps) => {
                 )}
 
                 <View style={styles.inputWrapper}>
-                  <Ionicons name="mail" size={20} color="#bfdbfe" style={styles.inputIcon} />
+                  <Mail size={20} color="#bfdbfe" style={styles.inputIcon} />
                   <TextInput
                     style={styles.textInput}
                     placeholder="Email"
@@ -166,7 +166,7 @@ const AuthScreen = ({ onComplete }: AuthScreenProps) => {
 
                 {mode !== 'forgot' && (
                   <View style={styles.inputWrapper}>
-                    <Ionicons name="lock-closed" size={20} color="#bfdbfe" style={styles.inputIcon} />
+                    <Lock size={20} color="#bfdbfe" style={styles.inputIcon} />
                     <TextInput
                       style={[styles.textInput, styles.passwordInput]}
                       placeholder="Password"
@@ -179,11 +179,11 @@ const AuthScreen = ({ onComplete }: AuthScreenProps) => {
                       style={styles.eyeIcon}
                       onPress={() => setShowPassword(!showPassword)}
                     >
-                      <Ionicons
-                        name={showPassword ? 'eye-off' : 'eye'}
-                        size={20}
-                        color="#bfdbfe"
-                      />
+                      {showPassword ? (
+                        <EyeOff size={20} color="#bfdbfe" />
+                      ) : (
+                        <Eye size={20} color="#bfdbfe" />
+                      )}
                     </TouchableOpacity>
                   </View>
                 )}
