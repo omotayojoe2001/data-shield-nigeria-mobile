@@ -8,6 +8,13 @@ interface BonusClaimStatus {
   welcome_bonus_active: boolean;
 }
 
+interface BonusInfo {
+  daysRemaining: number;
+  daysClaimed: number;
+  canClaim: boolean;
+  nextClaimTime?: Date;
+}
+
 class BonusService {
   async getBonusClaimStatus(): Promise<BonusClaimStatus | null> {
     try {
@@ -43,6 +50,65 @@ class BonusService {
     } catch (error) {
       console.error('Error in getBonusClaimStatus:', error);
       return null;
+    }
+  }
+
+  async getBonusInfo(): Promise<BonusInfo> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return {
+          daysRemaining: 0,
+          daysClaimed: 0,
+          canClaim: false,
+          nextClaimTime: undefined
+        };
+      }
+
+      const { data, error } = await supabase
+        .from('daily_bonus_claims')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching bonus info:', error);
+        return {
+          daysRemaining: 0,
+          daysClaimed: 0,
+          canClaim: false,
+          nextClaimTime: undefined
+        };
+      }
+
+      if (!data) {
+        return {
+          daysRemaining: 7,
+          daysClaimed: 0,
+          canClaim: true,
+          nextClaimTime: new Date()
+        };
+      }
+
+      const daysClaimed = data.days_claimed || 0;
+      const daysRemaining = Math.max(0, 7 - daysClaimed);
+      const nextClaimTime = data.next_claim_at ? new Date(data.next_claim_at) : new Date();
+      const canClaim = data.is_eligible && new Date() >= nextClaimTime && daysClaimed < 7;
+
+      return {
+        daysRemaining,
+        daysClaimed,
+        canClaim,
+        nextClaimTime
+      };
+    } catch (error) {
+      console.error('Error in getBonusInfo:', error);
+      return {
+        daysRemaining: 0,
+        daysClaimed: 0,
+        canClaim: false,
+        nextClaimTime: undefined
+      };
     }
   }
 
