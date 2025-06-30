@@ -29,6 +29,7 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     exclude: [
       'react-native',
+      'expo',
       'expo-network',
       'expo-haptics',
       '@react-native-async-storage/async-storage',
