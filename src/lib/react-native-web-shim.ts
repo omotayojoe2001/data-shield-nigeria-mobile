@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 
 // React Native Web Shim - provides empty implementations for web
@@ -38,6 +39,22 @@ export class NativeEventEmitter {
   emit(eventType: string, ...params: any[]) {}
   removeListener(eventType: string, listener: (...args: any[]) => any) {}
 }
+
+// AppRegistry shim for expo
+export const AppRegistry = {
+  registerComponent: (appName: string, getComponentFunc: () => React.ComponentType<any>) => {},
+  runApplication: (appName: string, initialProps: any) => {},
+  getAppKeys: () => [],
+  unmountApplicationComponentAtRootTag: (rootTag: number) => {},
+};
+
+// LogBox shim for expo
+export const LogBox = {
+  install: () => {},
+  uninstall: () => {},
+  ignoreLogs: (patterns: string[]) => {},
+  ignoreAllLogs: (ignore?: boolean) => {},
+};
 
 // Component mappings
 export const View = 'div';
@@ -137,6 +154,8 @@ export default {
   PixelRatio,
   NativeModules,
   NativeEventEmitter,
+  AppRegistry,
+  LogBox,
   View,
   Text,
   TouchableOpacity,
