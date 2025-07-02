@@ -6,8 +6,9 @@ import * as SplashScreen from 'expo-splash-screen';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { ThemeProvider } from './src/contexts/ThemeContext';
-import MainNavigator from './src/navigation/MainNavigator';
+import MainNavigator from './src/components/MainNavigator';
 import { mobileService } from './src/services/mobileService';
+import Toast from 'react-native-toast-message';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete
 SplashScreen.preventAutoHideAsync();
@@ -52,6 +53,7 @@ const App = () => {
           <AuthProvider>
             <StatusBar style="auto" />
             <MainNavigator />
+            <Toast />
           </AuthProvider>
         </ThemeProvider>
       </QueryClientProvider>
