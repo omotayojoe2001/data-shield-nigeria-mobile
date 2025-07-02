@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Shield, Home, Wallet, User, Settings } from 'lucide-react-native';
+import { Shield, Home, Wallet, User } from 'lucide-react-native';
 
 // Import screens
 import HomeScreen from '../screens/HomeScreen';
@@ -15,8 +15,22 @@ import PlansScreen from '../screens/PlansScreen';
 // Import auth context
 import { useAuth } from '../contexts/AuthContext';
 
-const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
+// Define navigation types
+export type RootStackParamList = {
+  Home: undefined;
+  Auth: undefined;
+  Main: undefined;
+  Plans: undefined;
+};
+
+export type TabParamList = {
+  Dashboard: undefined;
+  Wallet: undefined;
+  Profile: undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<TabParamList>();
 
 const DashboardTabs = () => {
   return (
