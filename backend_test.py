@@ -14,7 +14,7 @@ class SupabaseAPITester:
         self.user_id = None
         self.tests_run = 0
         self.tests_passed = 0
-        self.test_email = f"test_{int(time.time())}@example.com"
+        self.test_email = f"test.user.{int(time.time())}@gmail.com"
         self.test_password = "Test123456!"
 
     def run_test(self, name, func):
