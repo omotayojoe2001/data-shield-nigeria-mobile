@@ -17,14 +17,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.lovable.gooddeeds-data-vpn"
+      "bundleIdentifier": "app.gooddeeds.datavpn"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1e40af"
       },
-      "package": "app.lovable.gooddeeds_data_vpn",
+      "package": "app.gooddeeds.datavpn",
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
@@ -34,6 +34,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "main": "./App.js"
+    "main": "./App.js",
+    "scheme": "gooddeeds-vpn"
   }
 }
