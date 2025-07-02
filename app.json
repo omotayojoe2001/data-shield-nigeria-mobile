@@ -34,7 +34,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "main": "./App.tsx",
+    "main": "./App.js",
     "scheme": "gooddeeds-vpn",
     "sdkVersion": "53.0.0"
   }
