@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">GoodDeeds Data VPN</string>
-    <string name="title_activity_main">GoodDeeds Data VPN</string>
-    <string name="package_name">app.lovable.b0fa1f2568b94cff87eae303fc27a756</string>
-    <string name="custom_url_scheme">app.lovable.b0fa1f2568b94cff87eae303fc27a756</string>
-</resources>
