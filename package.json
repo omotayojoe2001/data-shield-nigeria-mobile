@@ -2,7 +2,7 @@
   "name": "gooddeeds-vpn-mobile",
   "private": true,
   "version": "1.0.0",
-  "main": "./App.js",
+  "main": "App.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
