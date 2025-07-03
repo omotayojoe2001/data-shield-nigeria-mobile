@@ -35,6 +35,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "scheme": "gooddeeds-vpn"
+    "scheme": "gooddeeds-vpn",
+    "sdkVersion": "53.0.16"
   }
 }

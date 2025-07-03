@@ -21,7 +21,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
-    "expo": "~53.0.0",
+    "expo": "~53.0.16",
     "expo-constants": "~17.1.6",
     "expo-font": "~13.3.2",
     "expo-haptics": "~14.1.4",
