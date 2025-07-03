@@ -2,7 +2,7 @@
   "name": "gooddeeds-vpn-mobile",
   "private": true,
   "version": "1.0.0",
-  "main": "App.js",
+  "main": "index.js",
   "scripts": {
     "start": "expo start",
     "dev": "expo start",
@@ -33,7 +33,7 @@
     "expo-web-browser": "~14.2.0",
     "react": "19.0.0",
     "react-hook-form": "^7.53.0",
-    "react-native": "0.79.5",
+    "react-native": "0.79.0",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
@@ -45,6 +45,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@react-native-community/cli": "^18.0.0",
     "@types/react": "~19.0.10",
     "typescript": "~5.8.3"
   }
