@@ -1,158 +1,161 @@
 
-import React, { useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
   SafeAreaView,
+  ScrollView,
+  Alert,
+  Switch,
   TextInput,
-  Alert
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
-const Stack = createNativeStackNavigator();
+// Create navigators
+const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Simple Auth Context
-const AuthContext = React.createContext();
+// Mock Authentication Context
+const AuthContext = React.createContext({
+  user: null,
+  signIn: () => {},
+  signUp: () => {},
+  signOut: () => {},
+  loading: false,
+});
 
-const AuthProvider = ({ children }) => {
+const useAuth = () => {
   const [user, setUser] = useState(null);
-  
-  const signIn = (email, password) => {
-    // Simple demo sign in
-    setUser({ email });
+  const [loading, setLoading] = useState(false);
+
+  const signIn = async (email, password) => {
+    setLoading(true);
+    // Simulate API call
+    setTimeout(() => {
+      setUser({ email, id: '1' });
+      setLoading(false);
+    }, 1000);
   };
-  
+
+  const signUp = async (email, password) => {
+    setLoading(true);
+    // Simulate API call
+    setTimeout(() => {
+      setUser({ email, id: '1' });
+      setLoading(false);
+    }, 1000);
+  };
+
   const signOut = () => {
     setUser(null);
   };
-  
-  return (
-    <AuthContext.Provider value={{ user, signIn, signOut }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
 
-const useAuth = () => React.useContext(AuthContext);
+  return { user, signIn, signUp, signOut, loading };
+};
 
 // Home Screen
 const HomeScreen = ({ navigation }) => (
   <SafeAreaView style={styles.container}>
     <ScrollView contentContainerStyle={styles.scrollContent}>
-      <Ionicons name="shield-checkmark" size={64} color="#2563eb" />
-      <Text style={styles.title}>GoodDeeds VPN</Text>
-      <Text style={styles.subtitle}>Secure. Fast. Affordable.</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>🎉 GoodDeeds VPN</Text>
+        <Text style={styles.subtitle}>Secure, Fast & Reliable</Text>
+      </View>
       
       <View style={styles.features}>
-        <View style={styles.featureCard}>
-          <Ionicons name="lock-closed" size={32} color="#2563eb" />
-          <Text style={styles.featureTitle}>Secure & Private</Text>
-          <Text style={styles.featureText}>Military-grade encryption keeps your data safe</Text>
+        <View style={styles.feature}>
+          <Ionicons name="shield-checkmark" size={40} color="#16a34a" />
+          <Text style={styles.featureTitle}>Secure Connection</Text>
+          <Text style={styles.featureText}>Military-grade encryption</Text>
         </View>
         
-        <View style={styles.featureCard}>
-          <Ionicons name="flash" size={32} color="#16a34a" />
-          <Text style={styles.featureTitle}>Data Compression</Text>
-          <Text style={styles.featureText}>Save up to 70% on your data usage</Text>
+        <View style={styles.feature}>
+          <Ionicons name="flash" size={40} color="#2563eb" />
+          <Text style={styles.featureTitle}>Lightning Fast</Text>
+          <Text style={styles.featureText}>High-speed servers worldwide</Text>
         </View>
         
-        <View style={styles.featureCard}>
-          <Ionicons name="cash" size={32} color="#ca8a04" />
-          <Text style={styles.featureTitle}>Affordable Plans</Text>
-          <Text style={styles.featureText}>Pay-as-you-go starting from ₦50/month</Text>
+        <View style={styles.feature}>
+          <Ionicons name="globe" size={40} color="#dc2626" />
+          <Text style={styles.featureTitle}>Global Access</Text>
+          <Text style={styles.featureText}>Access content anywhere</Text>
         </View>
       </View>
       
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Auth')}>
-        <Text style={styles.buttonText}>Get Started</Text>
-        <Ionicons name="arrow-forward" size={20} color="white" />
+      <TouchableOpacity 
+        style={styles.getStartedButton}
+        onPress={() => navigation.navigate('Auth')}
+      >
+        <Text style={styles.getStartedText}>Get Started</Text>
       </TouchableOpacity>
     </ScrollView>
   </SafeAreaView>
 );
 
 // Auth Screen
-const AuthScreen = ({ navigation }) => {
-  const { signIn } = useAuth();
-  const [isSignUp, setIsSignUp] = useState(false);
+const AuthScreen = () => {
+  const { signIn, signUp, loading } = React.useContext(AuthContext);
+  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
+
   const handleSubmit = () => {
-    if (email && password) {
-      signIn(email, password);
-      Alert.alert('Success', `${isSignUp ? 'Account created' : 'Signed in'} successfully!`);
-    } else {
+    if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+    
+    if (isLogin) {
+      signIn(email, password);
+    } else {
+      signUp(email, password);
     }
   };
-  
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.authContainer}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#6b7280" />
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-        
-        <Ionicons name="shield-checkmark" size={64} color="#2563eb" />
-        <Text style={styles.title}>Welcome to GoodDeeds VPN</Text>
-        <Text style={styles.subtitle}>
-          {isSignUp ? 'Create a new account' : 'Sign in to your account'}
+        <Text style={styles.authTitle}>
+          {isLogin ? 'Welcome Back' : 'Create Account'}
         </Text>
         
-        <View style={styles.tabs}>
-          <TouchableOpacity 
-            style={[styles.tab, !isSignUp && styles.activeTab]}
-            onPress={() => setIsSignUp(false)}
-          >
-            <Text style={[styles.tabText, !isSignUp && styles.activeTabText]}>Sign In</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tab, isSignUp && styles.activeTab]}
-            onPress={() => setIsSignUp(true)}
-          >
-            <Text style={[styles.tabText, isSignUp && styles.activeTabText]}>Sign Up</Text>
-          </TouchableOpacity>
-        </View>
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
         
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Enter your email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        </View>
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
         
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Enter your password"
-            secureTextEntry
-          />
-        </View>
+        <TouchableOpacity 
+          style={styles.authButton}
+          onPress={handleSubmit}
+          disabled={loading}
+        >
+          <Text style={styles.authButtonText}>
+            {loading ? 'Loading...' : (isLogin ? 'Sign In' : 'Sign Up')}
+          </Text>
+        </TouchableOpacity>
         
-        <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-          <Text style={styles.buttonText}>
-            {isSignUp ? 'Create Account' : 'Sign In'}
+        <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
+          <Text style={styles.switchText}>
+            {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -162,53 +165,41 @@ const AuthScreen = ({ navigation }) => {
 
 // Dashboard Screen
 const DashboardScreen = () => {
-  const { user } = useAuth();
-  const [vpnConnected, setVpnConnected] = useState(false);
-  
+  const [isConnected, setIsConnected] = useState(false);
+  const [dataUsed, setDataUsed] = useState(245);
+  const [dataLimit] = useState(1000);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Ionicons name="shield-checkmark" size={32} color="#2563eb" />
-          <Text style={styles.headerTitle}>Dashboard</Text>
-          <Text style={styles.userEmail}>{user?.email}</Text>
+        <View style={styles.dashboardHeader}>
+          <Text style={styles.dashboardTitle}>Dashboard</Text>
+          <Ionicons name="notifications-outline" size={24} color="#6b7280" />
         </View>
         
-        <View style={styles.vpnCard}>
-          <Ionicons 
-            name={vpnConnected ? "shield-checkmark" : "shield-outline"} 
-            size={48} 
-            color={vpnConnected ? "#16a34a" : "#ef4444"} 
-          />
-          <Text style={[styles.vpnStatus, vpnConnected ? styles.connected : styles.disconnected]}>
-            {vpnConnected ? 'Connected' : 'Disconnected'}
-          </Text>
-          {vpnConnected && <Text style={styles.vpnLocation}>Nigeria - Lagos</Text>}
+        <View style={styles.connectionCard}>
+          <View style={styles.connectionStatus}>
+            <View style={[styles.statusDot, { backgroundColor: isConnected ? '#16a34a' : '#dc2626' }]} />
+            <Text style={styles.statusText}>
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </Text>
+          </View>
           
           <TouchableOpacity 
-            style={[styles.vpnButton, vpnConnected ? styles.disconnectButton : styles.connectButton]}
-            onPress={() => setVpnConnected(!vpnConnected)}
+            style={[styles.connectButton, { backgroundColor: isConnected ? '#dc2626' : '#16a34a' }]}
+            onPress={() => setIsConnected(!isConnected)}
           >
-            <Ionicons name="power" size={20} color="white" />
-            <Text style={styles.buttonText}>
-              {vpnConnected ? 'Disconnect' : 'Connect'}
+            <Text style={styles.connectButtonText}>
+              {isConnected ? 'Disconnect' : 'Connect'}
             </Text>
           </TouchableOpacity>
         </View>
         
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Ionicons name="flash" size={24} color="#2563eb" />
-            <Text style={styles.statTitle}>Data Usage</Text>
-            <Text style={styles.statValue}>125 MB</Text>
-            <Text style={styles.statLabel}>Used</Text>
-          </View>
-          
-          <View style={styles.statCard}>
-            <Ionicons name="trending-down" size={24} color="#16a34a" />
-            <Text style={styles.statTitle}>Data Saved</Text>
-            <Text style={styles.statValue}>87 MB</Text>
-            <Text style={styles.statLabel}>Saved (41%)</Text>
+        <View style={styles.statsCard}>
+          <Text style={styles.statsTitle}>Data Usage</Text>
+          <Text style={styles.statsValue}>{dataUsed} MB / {dataLimit} MB</Text>
+          <View style={styles.progressBar}>
+            <View style={[styles.progress, { width: `${(dataUsed/dataLimit) * 100}%` }]} />
           </View>
         </View>
       </ScrollView>
@@ -243,7 +234,7 @@ const WalletScreen = () => (
 
 // Profile Screen
 const ProfileScreen = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut } = React.useContext(AuthContext);
   
   const handleSignOut = () => {
     Alert.alert(
@@ -282,9 +273,9 @@ const ProfileScreen = () => {
             <Ionicons name="chevron-forward" size={20} color="#6b7280" />
           </TouchableOpacity>
           
-          <TouchableOpacity style={[styles.profileOption, styles.signOutOption]} onPress={handleSignOut}>
-            <Ionicons name="log-out" size={24} color="#ef4444" />
-            <Text style={[styles.profileOptionText, styles.signOutText]}>Sign Out</Text>
+          <TouchableOpacity style={styles.profileOption} onPress={handleSignOut}>
+            <Ionicons name="log-out" size={24} color="#dc2626" />
+            <Text style={[styles.profileOptionText, { color: '#dc2626' }]}>Sign Out</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -292,123 +283,336 @@ const ProfileScreen = () => {
   );
 };
 
-// Tab Navigator
+// Dashboard Tab Navigator
 const DashboardTabs = () => (
-  <Tab.Navigator 
-    screenOptions={{
-      headerShown: false,
+  <Tab.Navigator
+    screenOptions={({ route }) => ({
+      tabBarIcon: ({ focused, color, size }) => {
+        let iconName;
+        
+        if (route.name === 'Dashboard') {
+          iconName = focused ? 'home' : 'home-outline';
+        } else if (route.name === 'Wallet') {
+          iconName = focused ? 'wallet' : 'wallet-outline';
+        } else if (route.name === 'Profile') {
+          iconName = focused ? 'person' : 'person-outline';
+        }
+        
+        return <Ionicons name={iconName} size={size} color={color} />;
+      },
       tabBarActiveTintColor: '#2563eb',
-      tabBarInactiveTintColor: '#6b7280',
-    }}
+      tabBarInactiveTintColor: 'gray',
+      headerShown: false,
+    })}
   >
-    <Tab.Screen 
-      name="Dashboard" 
-      component={DashboardScreen}
-      options={{
-        tabBarIcon: ({ color, size }) => (
-          <Ionicons name="shield-checkmark" size={size} color={color} />
-        ),
-      }}
-    />
-    <Tab.Screen 
-      name="Wallet" 
-      component={WalletScreen}
-      options={{
-        tabBarIcon: ({ color, size }) => (
-          <Ionicons name="wallet" size={size} color={color} />
-        ),
-      }}
-    />
-    <Tab.Screen 
-      name="Profile" 
-      component={ProfileScreen}
-      options={{
-        tabBarIcon: ({ color, size }) => (
-          <Ionicons name="person" size={size} color={color} />
-        ),
-      }}
-    />
+    <Tab.Screen name="Dashboard" component={DashboardScreen} />
+    <Tab.Screen name="Wallet" component={WalletScreen} />
+    <Tab.Screen name="Profile" component={ProfileScreen} />
   </Tab.Navigator>
 );
 
-// Main App
-const AppNavigator = () => {
-  const { user } = useAuth();
+// Main Navigator
+const MainNavigator = () => {
+  const { user } = React.useContext(AuthContext);
   
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {user ? (
-          <Stack.Screen name="Main" component={DashboardTabs} />
-        ) : (
-          <>
-            <Stack.Screen name="Home" component={HomeScreen} />
-            <Stack.Screen name="Auth" component={AuthScreen} />
-          </>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {user ? (
+        <Stack.Screen name="Main" component={DashboardTabs} />
+      ) : (
+        <>
+          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Auth" component={AuthScreen} />
+        </>
+      )}
+    </Stack.Navigator>
   );
 };
 
-const App = () => (
-  <AuthProvider>
-    <StatusBar style="auto" />
-    <AppNavigator />
-  </AuthProvider>
-);
+// Main App Component
+export default function App() {
+  const auth = useAuth();
+  
+  return (
+    <SafeAreaProvider>
+      <AuthContext.Provider value={auth}>
+        <NavigationContainer>
+          <StatusBar style="auto" />
+          <MainNavigator />
+        </NavigationContainer>
+      </AuthContext.Provider>
+    </SafeAreaProvider>
+  );
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  scrollContent: { padding: 20, alignItems: 'center' },
-  title: { fontSize: 32, fontWeight: 'bold', color: '#2563eb', marginBottom: 16, textAlign: 'center' },
-  subtitle: { fontSize: 18, color: '#6b7280', marginBottom: 32, textAlign: 'center' },
-  features: { width: '100%', marginBottom: 32 },
-  featureCard: { backgroundColor: '#fff', padding: 20, borderRadius: 12, marginBottom: 16, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  featureTitle: { fontSize: 18, fontWeight: '600', color: '#111827', marginTop: 12, marginBottom: 8, textAlign: 'center' },
-  featureText: { fontSize: 14, color: '#6b7280', textAlign: 'center' },
-  button: { backgroundColor: '#2563eb', paddingVertical: 16, paddingHorizontal: 32, borderRadius: 8, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  authContainer: { flex: 1, justifyContent: 'center', padding: 20 },
-  backButton: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, alignSelf: 'flex-start' },
-  backText: { marginLeft: 8, color: '#6b7280', fontSize: 16 },
-  tabs: { flexDirection: 'row', backgroundColor: '#f3f4f6', borderRadius: 8, padding: 4, marginBottom: 24 },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 6 },
-  activeTab: { backgroundColor: '#ffffff' },
-  tabText: { fontSize: 16, color: '#6b7280' },
-  activeTabText: { color: '#111827', fontWeight: '600' },
-  inputGroup: { width: '100%', marginBottom: 16 },
-  label: { fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 8 },
-  input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, backgroundColor: '#ffffff' },
-  header: { alignItems: 'center', marginBottom: 24 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#111827', marginTop: 8 },
-  userEmail: { fontSize: 14, color: '#6b7280' },
-  vpnCard: { backgroundColor: '#fff', padding: 24, borderRadius: 16, marginBottom: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, width: '100%' },
-  vpnStatus: { fontSize: 24, fontWeight: 'bold', marginTop: 16, marginBottom: 8 },
-  connected: { color: '#16a34a' },
-  disconnected: { color: '#ef4444' },
-  vpnLocation: { fontSize: 16, color: '#6b7280', marginBottom: 16 },
-  vpnButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 32, borderRadius: 8, gap: 8 },
-  connectButton: { backgroundColor: '#16a34a' },
-  disconnectButton: { backgroundColor: '#ef4444' },
-  statsRow: { flexDirection: 'row', gap: 16, width: '100%' },
-  statCard: { flex: 1, backgroundColor: '#fff', padding: 20, borderRadius: 12, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  statTitle: { fontSize: 14, color: '#6b7280', marginTop: 8, marginBottom: 8 },
-  statValue: { fontSize: 24, fontWeight: 'bold', color: '#2563eb', marginBottom: 4 },
-  statLabel: { fontSize: 12, color: '#6b7280' },
-  walletContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  balance: { fontSize: 48, fontWeight: 'bold', color: '#16a34a', marginBottom: 8 },
-  balanceSubtitle: { fontSize: 16, color: '#6b7280', marginBottom: 32 },
-  quickAmounts: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 24 },
-  amountButton: { backgroundColor: '#f3f4f6', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: '#d1d5db' },
-  amountText: { fontSize: 16, color: '#374151', fontWeight: '500' },
-  profileContainer: { flex: 1, alignItems: 'center', padding: 20 },
-  profileEmail: { fontSize: 18, color: '#6b7280', marginBottom: 32 },
-  profileOptions: { width: '100%' },
-  profileOption: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
-  profileOptionText: { flex: 1, fontSize: 16, color: '#374151', marginLeft: 12 },
-  signOutOption: { borderColor: '#fecaca', borderWidth: 1 },
-  signOutText: { color: '#ef4444' },
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: 20,
+  },
+  header: {
+    alignItems: 'center',
+    marginVertical: 40,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#2563eb',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 18,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  features: {
+    marginVertical: 40,
+  },
+  feature: {
+    alignItems: 'center',
+    marginBottom: 30,
+    padding: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  featureTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  featureText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  getStartedButton: {
+    backgroundColor: '#2563eb',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  getStartedText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  authContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  authTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  input: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    marginBottom: 16,
+    fontSize: 16,
+  },
+  authButton: {
+    backgroundColor: '#2563eb',
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  authButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  switchText: {
+    color: '#2563eb',
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  dashboardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  dashboardTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  connectionCard: {
+    backgroundColor: '#ffffff',
+    padding: 24,
+    borderRadius: 16,
+    marginBottom: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  statusText: {
+    fontSize: 16,
+    color: '#1f2937',
+    fontWeight: '500',
+  },
+  connectButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    borderRadius: 12,
+  },
+  connectButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  statsCard: {
+    backgroundColor: '#ffffff',
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  statsValue: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 12,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progress: {
+    height: '100%',
+    backgroundColor: '#2563eb',
+  },
+  walletContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  balance: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#16a34a',
+    marginVertical: 16,
+  },
+  balanceSubtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 32,
+  },
+  button: {
+    backgroundColor: '#2563eb',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginBottom: 32,
+  },
+  buttonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  quickAmounts: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  amountButton: {
+    backgroundColor: '#f3f4f6',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginBottom: 12,
+    width: '48%',
+    alignItems: 'center',
+  },
+  amountText: {
+    color: '#1f2937',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  profileContainer: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 60,
+  },
+  profileEmail: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 40,
+  },
+  profileOptions: {
+    width: '100%',
+  },
+  profileOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  profileOptionText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1f2937',
+    marginLeft: 16,
+  },
 });
-
-export default App;
