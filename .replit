@@ -18,3 +18,15 @@ externalPort = 3000
 [[ports]]
 localPort = 8083
 externalPort = 3001
+
+[workflows]
+runButton = "Expo Dev Server"
+
+[[workflows.workflow]]
+name = "Expo Dev Server"
+author = 44435231
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx expo start --tunnel --clear"
