@@ -1,12 +1,17 @@
-import * as React from "react"
+import * as React from "react";
+import { View, Text } from "react-native";
+import { styled } from "nativewind";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
+
+const StyledView = styled(View);
+const StyledText = styled(Text);
 
 const Card = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
+  React.ElementRef<typeof StyledView>,
+  React.ComponentPropsWithoutRef<typeof StyledView>
 >(({ className, ...props }, ref) => (
-  <div
+  <StyledView
     ref={ref}
     className={cn(
       "rounded-lg border bg-card text-card-foreground shadow-sm",
@@ -14,26 +19,26 @@ const Card = React.forwardRef<
     )}
     {...props}
   />
-))
-Card.displayName = "Card"
+));
+Card.displayName = "Card";
 
 const CardHeader = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
+  React.ElementRef<typeof StyledView>,
+  React.ComponentPropsWithoutRef<typeof StyledView>
 >(({ className, ...props }, ref) => (
-  <div
+  <StyledView
     ref={ref}
     className={cn("flex flex-col space-y-1.5 p-6", className)}
     {...props}
   />
-))
-CardHeader.displayName = "CardHeader"
+));
+CardHeader.displayName = "CardHeader";
 
 const CardTitle = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLHeadingElement>
+  React.ElementRef<typeof StyledText>,
+  React.ComponentPropsWithoutRef<typeof StyledText>
 >(({ className, ...props }, ref) => (
-  <h3
+  <StyledText
     ref={ref}
     className={cn(
       "text-2xl font-semibold leading-none tracking-tight",
@@ -41,39 +46,39 @@ const CardTitle = React.forwardRef<
     )}
     {...props}
   />
-))
-CardTitle.displayName = "CardTitle"
+));
+CardTitle.displayName = "CardTitle";
 
 const CardDescription = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
+  React.ElementRef<typeof StyledText>,
+  React.ComponentPropsWithoutRef<typeof StyledText>
 >(({ className, ...props }, ref) => (
-  <p
+  <StyledText
     ref={ref}
     className={cn("text-sm text-muted-foreground", className)}
     {...props}
   />
-))
-CardDescription.displayName = "CardDescription"
+));
+CardDescription.displayName = "CardDescription";
 
 const CardContent = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
+  React.ElementRef<typeof StyledView>,
+  React.ComponentPropsWithoutRef<typeof StyledView>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
-))
-CardContent.displayName = "CardContent"
+  <StyledView ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+));
+CardContent.displayName = "CardContent";
 
 const CardFooter = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
+  React.ElementRef<typeof StyledView>,
+  React.ComponentPropsWithoutRef<typeof StyledView>
 >(({ className, ...props }, ref) => (
-  <div
+  <StyledView
     ref={ref}
     className={cn("flex items-center p-6 pt-0", className)}
     {...props}
   />
-))
-CardFooter.displayName = "CardFooter"
+));
+CardFooter.displayName = "CardFooter";
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };

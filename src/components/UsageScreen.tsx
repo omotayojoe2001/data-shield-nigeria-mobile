@@ -1,8 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingDown, Smartphone, Globe, Settings, Eye, EyeOff, Zap, Database, Wallet } from 'lucide-react';
+import { View, Text, TouchableOpacity } from 'react-native'; // Added basic RN components
+import { Svg, Circle } from 'react-native-svg'; // Added react-native-svg
+import { BarChart3, TrendingDown, Smartphone, Globe, Settings, Eye, EyeOff, Zap, Database, Wallet } from 'lucide-react-native'; // Corrected import
 import { vpnService } from '../services/vpnService';
 import { billingService, PAYG_RATE } from '../services/billingService';
+import { styled } from 'nativewind'; // Added styled
 import { planService, type UserPlan } from '../services/planService';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -270,40 +273,47 @@ const UsageScreen = () => {
           )}
 
           {/* Savings Gauge */}
-          <div className="relative w-32 h-32 mx-auto mb-4">
-            <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
-              <circle
+          <StyledView className="relative w-32 h-32 mx-auto mb-4">
+            <Svg
+              width="128"
+              height="128"
+              viewBox="0 0 120 120"
+              rotation="-90"
+              originX="60"
+              originY="60"
+            >
+              <Circle
                 cx="60"
                 cy="60"
                 r="50"
-                stroke="#e5e7eb"
+                stroke={theme === 'dark' ? "#374151" : "#e5e7eb"} // Adjusted for theme
                 strokeWidth="8"
                 fill="none"
               />
-              <circle
+              <Circle
                 cx="60"
                 cy="60"
                 r="50"
-                stroke="#059669"
+                stroke="#059669" // text-green-700
                 strokeWidth="8"
                 fill="none"
                 strokeLinecap="round"
-                strokeDasharray={`${currentData.percentage * 3.14159} ${100 * 3.14159}`}
-                className="transition-all duration-1000"
+                strokeDasharray={`${currentData.percentage * 3.14159} ${314.159}`} // 100 * pi
+                // className="transition-all duration-1000" // Animation needs re-implementation
               />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>{currentData.percentage}%</div>
-                <div className={`text-xs ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>Saved</div>
-              </div>
-            </div>
-          </div>
+            </Svg>
+            <StyledView className="absolute inset-0 flex items-center justify-center">
+              <StyledView className="text-center items-center"> {/* Added items-center for RN text centering */}
+                <StyledText className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>{currentData.percentage}%</StyledText>
+                <StyledText className={`text-xs ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>Saved</StyledText>
+              </StyledView>
+            </StyledView>
+          </StyledView>
 
-          <p className={`text-center ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
+          <StyledText className={`text-center ${theme === 'dark' ? 'text-gray-300' : 'text-blue-600'}`}>
             {currentData.percentage >= 60 ? 'Excellent!' : 'Good!'} You're saving {currentData.percentage}% of your data usage.
-          </p>
-        </div>
+          </StyledText>
+        </StyledView>
 
         {/* App-wise Usage with Real-time Updates */}
         {showDetails && (

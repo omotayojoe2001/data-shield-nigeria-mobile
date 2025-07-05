@@ -2,11 +2,8 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  TextInput,
   TouchableOpacity,
   SafeAreaView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -14,6 +11,19 @@ import { Shield, ArrowLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../integrations/supabase/client';
 import Toast from 'react-native-toast-message';
+import { styled } from 'nativewind';
+
+// Import refactored UI components
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Card, CardHeader, CardContent } from '../components/ui/card'; // Assuming CardFooter, CardTitle, CardDescription might not be directly needed here or can be Text
+
+const StyledSafeAreaView = styled(SafeAreaView);
+const StyledKeyboardAvoidingView = styled(KeyboardAvoidingView);
+const StyledView = styled(View);
+const StyledText = styled(Text);
+const StyledTouchableOpacity = styled(TouchableOpacity);
 
 const AuthScreen = () => {
   const navigation = useNavigation();
@@ -34,7 +44,7 @@ const AuthScreen = () => {
         type: 'success',
         text1: 'Check your email for verification link!',
       });
-    } catch (error) {
+    } catch (error: any) {
       Toast.show({
         type: 'error',
         text1: error.message,
@@ -56,7 +66,8 @@ const AuthScreen = () => {
         type: 'success',
         text1: 'Welcome back!',
       });
-    } catch (error) {
+      // navigation.navigate('Main'); // Or wherever you navigate after sign in
+    } catch (error: any) {
       Toast.show({
         type: 'error',
         text1: error.message,
@@ -75,195 +86,95 @@ const AuthScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
+    <StyledSafeAreaView className="flex-1 bg-gray-100">
+      <StyledKeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
+        className="flex-1 justify-center px-5"
       >
-        <TouchableOpacity
-          style={styles.backButton}
+        <StyledTouchableOpacity
+          className="flex-row items-center mb-5 absolute top-5 left-5 pt-3" // Positioned for typical back button
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft color="#6b7280" size={20} />
-          <Text style={styles.backText}>Back to Home</Text>
-        </TouchableOpacity>
+          <ArrowLeft color="#6b7280" size={24} />
+          <StyledText className="ml-2 text-gray-500 text-base">
+            Back
+          </StyledText>
+        </StyledTouchableOpacity>
 
-        <View style={styles.card}>
-          <View style={styles.header}>
-            <Shield color="#2563eb" size={48} />
-            <Text style={styles.title}>Welcome to GoodDeeds VPN</Text>
-            <Text style={styles.subtitle}>
+        <Card className="bg-white rounded-xl p-6 shadow-lg">
+          <CardHeader className="items-center mb-8 pt-0">
+            <Shield color="#2563eb" size={48} className="mb-4" />
+            <StyledText className="text-2xl font-bold text-gray-900 mb-1">
+              Welcome
+            </StyledText>
+            <StyledText className="text-base text-gray-500 text-center">
               {isSignUp ? 'Create a new account' : 'Sign in to your account'}
-            </Text>
-          </View>
+            </StyledText>
+          </CardHeader>
 
-          <View style={styles.form}>
-            <View style={styles.tabs}>
-              <TouchableOpacity
-                style={[styles.tab, !isSignUp && styles.activeTab]}
+          <CardContent className="space-y-6 pt-0">
+            <StyledView className="flex-row bg-gray-200 rounded-lg p-1">
+              <Button
+                variant={!isSignUp ? 'default' : 'ghost'}
                 onPress={() => setIsSignUp(false)}
+                className="flex-1"
+                textClassName={!isSignUp ? "text-white" : "text-gray-600"}
               >
-                <Text style={[styles.tabText, !isSignUp && styles.activeTabText]}>
-                  Sign In
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, isSignUp && styles.activeTab]}
+                Sign In
+              </Button>
+              <Button
+                variant={isSignUp ? 'default' : 'ghost'}
                 onPress={() => setIsSignUp(true)}
+                className="flex-1"
+                textClassName={isSignUp ? "text-white" : "text-gray-600"}
               >
-                <Text style={[styles.tabText, isSignUp && styles.activeTabText]}>
-                  Sign Up
-                </Text>
-              </TouchableOpacity>
-            </View>
+                Sign Up
+              </Button>
+            </StyledView>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={styles.input}
+            <StyledView className="space-y-2">
+              <Label className="text-base font-semibold text-gray-800">
+                Email
+              </Label>
+              <Input
                 value={email}
                 onChangeText={setEmail}
                 placeholder="Enter your email"
                 keyboardType="email-address"
                 autoCapitalize="none"
+                className="bg-white" // Ensure input background is distinct if card bg is similar
               />
-            </View>
+            </StyledView>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
-              <TextInput
-                style={styles.input}
+            <StyledView className="space-y-2">
+              <Label className="text-base font-semibold text-gray-800">
+                Password
+              </Label>
+              <Input
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Enter your password"
                 secureTextEntry
                 autoCapitalize="none"
+                className="bg-white"
               />
-            </View>
+            </StyledView>
 
-            <TouchableOpacity
-              style={[styles.submitButton, loading && styles.disabledButton]}
+            <Button
               onPress={handleSubmit}
               disabled={loading}
+              className={`py-3 ${loading ? "opacity-60" : ""}`}
             >
-              <Text style={styles.submitButtonText}>
-                {loading 
-                  ? (isSignUp ? 'Creating account...' : 'Signing in...') 
-                  : (isSignUp ? 'Create Account' : 'Sign In')
-                }
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
+              {loading
+                ? (isSignUp ? 'Creating account...' : 'Signing in...')
+                : (isSignUp ? 'Create Account' : 'Sign In')}
+            </Button>
+          </CardContent>
+        </Card>
+      </StyledKeyboardAvoidingView>
       <Toast />
-    </SafeAreaView>
+    </StyledSafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f3f4f6',
-  },
-  keyboardView: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  backText: {
-    marginLeft: 8,
-    color: '#6b7280',
-    fontSize: 16,
-  },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 8,
-    color: '#111827',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  form: {
-    gap: 24,
-  },
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 6,
-  },
-  activeTab: {
-    backgroundColor: '#ffffff',
-  },
-  tabText: {
-    fontSize: 16,
-    color: '#6b7280',
-  },
-  activeTabText: {
-    color: '#111827',
-    fontWeight: '600',
-  },
-  inputGroup: {
-    gap: 8,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    backgroundColor: '#ffffff',
-  },
-  submitButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
 
 export default AuthScreen;
