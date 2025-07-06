@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3 } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
 
 const UsageScreen = () => {
