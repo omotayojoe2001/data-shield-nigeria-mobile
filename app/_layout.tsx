@@ -6,7 +6,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { useFrameworkReady } from '../hooks/useFrameworkReady';
-import Toast from 'react-native-toast-message';
+import Toast from 'react-native-toast-message'
+import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
 const queryClient = new QueryClient({
   defaultOptions: {
